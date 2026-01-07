@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --color-nothing-black: #000000;
+  --color-nothing-white: #ffffff;
+  --color-nothing-grey: #666666;
+  --font-dot: "Courier New", Courier, monospace;
+}
+
+:root {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Effet de fond "Dot Grid" typique de Nothing */
+.nothing-bg {
+  background-color: #ffffff;
+  background-image: radial-gradient(#e5e5e5 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.nothing-dot-font {
+  font-family: var(--font-dot);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.nothing-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid #000000;
+  border-radius: 0;
+}
+
+/* Animation subtile pour les boutons */
+@keyframes dot-pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.nothing-btn-active::after {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: #ff0000; /* Point rouge signature Nothing */
+  border-radius: 50%;
+  margin-left: 8px;
+  animation: dot-pulse 2s infinite;
+}
