@@ -1,5 +1,6 @@
 import React from 'react';
 import { Mail, MapPin, Phone, Globe } from 'lucide-react';
+import { escapeHtml, sanitizeUrl, sanitizeEmail, sanitizePhone } from '../../../utils/escapeHtml';
 
 export const ResultsList = ({ results, loading }) => {
   if (loading) {
@@ -37,12 +38,12 @@ export const ResultsList = ({ results, loading }) => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex-1">
                 {company.sector && (
-                  <div className="text-xs text-zinc-400 mb-1">{company.sector}</div>
+                  <div className="text-xs text-zinc-400 mb-1">{escapeHtml(company.sector)}</div>
                 )}
-                <h3 className="text-xl font-bold mb-2">{company.name}</h3>
+                <h3 className="text-xl font-bold mb-2">{escapeHtml(company.name)}</h3>
                 <div className="flex items-center gap-1 text-sm text-zinc-500 mb-2">
                   <MapPin className="w-3 h-3" />
-                  {company.address}
+                  {escapeHtml(company.address)}
                 </div>
                 
                 {/* Afficher les coordonnées disponibles (si présentes) */}
@@ -51,13 +52,13 @@ export const ResultsList = ({ results, loading }) => {
                     {company.email && (
                       <div className="flex items-center gap-1">
                         <Mail className="w-3 h-3" />
-                        <span>{company.email}</span>
+                        <span>{escapeHtml(company.email)}</span>
                       </div>
                     )}
                     {company.phone && (
                       <div className="flex items-center gap-1">
                         <Phone className="w-3 h-3" />
-                        <span>{company.phone}</span>
+                        <span>{escapeHtml(company.phone)}</span>
                       </div>
                     )}
                   </div>
@@ -70,27 +71,27 @@ export const ResultsList = ({ results, loading }) => {
               </div>
 
               <div className="flex gap-2 flex-wrap">
-                {company.email && (
+                {company.email && sanitizeEmail(company.email) && (
                   <a 
-                    href={`mailto:${company.email}`} 
+                    href={`mailto:${sanitizeEmail(company.email)}`} 
                     className="text-xs border border-black px-4 py-2 hover:bg-black hover:text-white transition-all"
                   >
                     Email
                   </a>
                 )}
-                {company.phone && (
+                {company.phone && sanitizePhone(company.phone) && (
                   <a 
-                    href={`tel:${company.phone}`} 
+                    href={`tel:${sanitizePhone(company.phone)}`} 
                     className="text-xs border border-black px-4 py-2 hover:bg-black hover:text-white transition-all"
                   >
                     Téléphone
                   </a>
                 )}
-                {company.website && (
+                {company.website && sanitizeUrl(company.website) && (
                   <a 
-                    href={company.website} 
+                    href={sanitizeUrl(company.website)} 
                     target="_blank" 
-                    rel="noreferrer" 
+                    rel="noreferrer noopener" 
                     className="text-xs border border-black px-4 py-2 hover:bg-black hover:text-white transition-all"
                   >
                     Site web

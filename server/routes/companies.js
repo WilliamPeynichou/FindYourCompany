@@ -3,16 +3,18 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const sireneService = require('../services/sireneService');
 const { Company } = require('../models');
+const { validateSearchRequest, validateGetCompanies, handleValidationErrors } = require('../middleware/validation');
 
 /**
  * Route de recherche d'entreprises
  * POST /api/companies/search
  * Body: { location: { lat, lon, city, postcode }, radius, sector }
  */
-router.post('/search', async (req, res) => {
+router.post('/search', validateSearchRequest, handleValidationErrors, async (req, res) => {
   console.log('📥 Requête reçue:', req.body);
   
   try {
+    // Les données sont déjà validées et sanitizées par express-validator
     const { location, radius, sector } = req.body;
 
     if (!location || !location.lat || !location.lon) {
@@ -78,8 +80,9 @@ router.post('/search', async (req, res) => {
  * Route pour récupérer les entreprises depuis la base de données
  * GET /api/companies?city=&sector=
  */
-router.get('/', async (req, res) => {
+router.get('/', validateGetCompanies, handleValidationErrors, async (req, res) => {
   try {
+    // Les paramètres sont déjà validés et sanitizés
     const { city, sector } = req.query;
     
     const where = {};

@@ -10,14 +10,34 @@ import { Button } from '../../../components/ui/Button';
 
 const searchSchema = z.object({
   location: z.object({
-    label: z.string(),
-    lat: z.string(),
-    lon: z.string(),
-    city: z.string().optional(),
-    postcode: z.string().optional()
+    label: z.string()
+      .max(200, "Le label est trop long")
+      .refine(val => !/[<>\"']/.test(val), "Le label contient des caractères invalides"),
+    lat: z.string()
+      .refine(val => {
+        const num = parseFloat(val);
+        return !isNaN(num) && num >= -90 && num <= 90;
+      }, "La latitude doit être entre -90 et 90"),
+    lon: z.string()
+      .refine(val => {
+        const num = parseFloat(val);
+        return !isNaN(num) && num >= -180 && num <= 180;
+      }, "La longitude doit être entre -180 et 180"),
+    city: z.string()
+      .max(100, "Le nom de la ville est trop long")
+      .regex(/^[a-zA-ZÀ-ÿ\s\-'\.]*$/, "Le nom de la ville contient des caractères invalides")
+      .optional(),
+    postcode: z.string()
+      .regex(/^[0-9]{5}$|^$/, "Le code postal doit contenir 5 chiffres")
+      .optional()
   }).nullable().refine(val => val !== null, "Veuillez choisir un lieu"),
-  radius: z.number().min(0).max(200),
-  sector: z.string().optional()
+  radius: z.number()
+    .min(0, "Le rayon doit être positif")
+    .max(200, "Le rayon ne peut pas dépasser 200 km"),
+  sector: z.string()
+    .max(100, "Le secteur est trop long")
+    .regex(/^[a-zA-ZÀ-ÿ0-9\s\/\-\.]*$/, "Le secteur contient des caractères invalides")
+    .optional()
 });
 
 export const SearchForm = ({ onSearch, loading }) => {

@@ -18,17 +18,28 @@ class SireneService {
       // L'API Sirene utilise le code postal dans le champ codePostalEtablissement
       let query = '';
       
+      // Protection contre les injections : utiliser uniquement des valeurs validées
+      // Les paramètres sont déjà sanitizés par express-validator
       if (postcode) {
-        query += `codePostalEtablissement:${postcode}`;
+        // S'assurer que le code postal ne contient que des chiffres
+        const cleanPostcode = String(postcode).replace(/[^0-9]/g, '');
+        if (cleanPostcode.length === 5) {
+          query += `codePostalEtablissement:${cleanPostcode}`;
+        }
       } else if (city) {
-        query += `libelleCommuneEtablissement:"${city}"`;
+        // Échapper les guillemets pour éviter les injections
+        const cleanCity = String(city).replace(/["']/g, '').trim();
+        if (cleanCity.length > 0 && cleanCity.length <= 100) {
+          query += `libelleCommuneEtablissement:"${cleanCity}"`;
+        }
       }
 
       // Ajouter le secteur d'activité si fourni
       if (sector) {
         // Convertir le secteur en code APE/NAF approximatif
         const apeCode = this.getApeCodeFromSector(sector);
-        if (apeCode) {
+        if (apeCode && /^[0-9]{2}$/.test(apeCode)) {
+          // S'assurer que le code APE ne contient que des chiffres
           query += ` AND activitePrincipaleUniteLegale:${apeCode}*`;
         }
       }

@@ -1,9 +1,23 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Sécurité : Helmet pour les headers HTTP sécurisés
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false
+}));
 
 // Configuration CORS pour permettre les requêtes depuis le frontend
 app.use(cors({
@@ -14,8 +28,8 @@ app.use(cors({
 }));
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' })); // Limiter la taille des requêtes
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Log des requêtes pour déboguer
 app.use((req, res, next) => {
