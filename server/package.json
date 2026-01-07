@@ -7,6 +7,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "n8n": "n8n start",
+    "migrate": "node scripts/migrate-db.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,9 +15,12 @@
   "license": "ISC",
   "dependencies": {
     "@n8n/n8n-nodes-langchain": "^2.3.1",
+    "axios": "^1.13.2",
+    "cheerio": "^1.1.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "mysql2": "^3.16.0",
     "n8n": "^1.28.0",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, MapPin, Building2, Globe } from 'lucide-react';
+import { Mail, MapPin, Phone, Globe } from 'lucide-react';
 
 export const ResultsList = ({ results, loading }) => {
   if (loading) {
@@ -12,10 +12,12 @@ export const ResultsList = ({ results, loading }) => {
     );
   }
 
-  if (!results || results.length === 0) {
+  const filteredResults = results || [];
+
+  if (!filteredResults || filteredResults.length === 0) {
     return (
       <div className="text-center py-16 text-zinc-400 text-sm">
-        Aucun résultat. Remplissez le formulaire pour lancer une recherche.
+        Aucune entreprise trouvée.
       </div>
     );
   }
@@ -24,31 +26,66 @@ export const ResultsList = ({ results, loading }) => {
     <div className="space-y-3">
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-zinc-200">
         <h2 className="text-lg font-bold">
-          {results.length} {results.length === 1 ? 'entreprise trouvée' : 'entreprises trouvées'}
+          {filteredResults.length} {filteredResults.length === 1 ? 'entreprise trouvée' : 'entreprises trouvées'}
         </h2>
         <button className="text-xs text-zinc-500 hover:text-black">Exporter en CSV</button>
       </div>
       
       <div className="space-y-2">
-        {results.map((company) => (
-          <div key={company.id} className="bg-white p-6 border border-zinc-200 hover:border-black transition-all">
+        {filteredResults.map((company, index) => (
+          <div key={company.id || company.siret || index} className="bg-white p-6 border border-zinc-200 hover:border-black transition-all">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex-1">
-                <div className="text-xs text-zinc-400 mb-1">{company.sector}</div>
+                {company.sector && (
+                  <div className="text-xs text-zinc-400 mb-1">{company.sector}</div>
+                )}
                 <h3 className="text-xl font-bold mb-2">{company.name}</h3>
-                <div className="flex items-center gap-1 text-sm text-zinc-500">
+                <div className="flex items-center gap-1 text-sm text-zinc-500 mb-2">
                   <MapPin className="w-3 h-3" />
                   {company.address}
                 </div>
+                
+                {/* Afficher les coordonnées disponibles (si présentes) */}
+                {(company.email || company.phone) && (
+                  <div className="flex flex-wrap gap-3 text-xs text-zinc-600">
+                    {company.email && (
+                      <div className="flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        <span>{company.email}</span>
+                      </div>
+                    )}
+                    {company.phone && (
+                      <div className="flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        <span>{company.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!company.email && !company.phone && (
+                  <div className="text-xs text-zinc-400 italic">
+                    Coordonnées non disponibles dans Sirene
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-2">
-                <a 
-                  href={`mailto:${company.email}`} 
-                  className="text-xs border border-black px-4 py-2 hover:bg-black hover:text-white transition-all"
-                >
-                  Email
-                </a>
+              <div className="flex gap-2 flex-wrap">
+                {company.email && (
+                  <a 
+                    href={`mailto:${company.email}`} 
+                    className="text-xs border border-black px-4 py-2 hover:bg-black hover:text-white transition-all"
+                  >
+                    Email
+                  </a>
+                )}
+                {company.phone && (
+                  <a 
+                    href={`tel:${company.phone}`} 
+                    className="text-xs border border-black px-4 py-2 hover:bg-black hover:text-white transition-all"
+                  >
+                    Téléphone
+                  </a>
+                )}
                 {company.website && (
                   <a 
                     href={company.website} 
@@ -58,6 +95,11 @@ export const ResultsList = ({ results, loading }) => {
                   >
                     Site web
                   </a>
+                )}
+                {!company.email && !company.phone && !company.website && (
+                  <span className="text-xs text-zinc-400 px-4 py-2">
+                    Pas de contact disponible
+                  </span>
                 )}
               </div>
             </div>

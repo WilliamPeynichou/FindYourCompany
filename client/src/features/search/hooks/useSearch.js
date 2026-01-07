@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import axios from 'axios';
 
+// Utiliser le proxy Vite en développement, ou l'URL complète en production
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'http://localhost:3000');
+
 /**
  * Hook pour gérer la logique de recherche
  */
@@ -12,54 +15,85 @@ export const useSearch = () => {
   const performSearch = async (formData) => {
     setLoading(true);
     setError(null);
+    setResults([]);
     
     try {
-      // Simulation d'un appel API vers le backend
-      // En production, décommentez la ligne suivante :
-      // const response = await axios.post('/api/companies/search', formData);
-      // setResults(response.data);
+      // Vérifier que les données requises sont présentes
+      if (!formData.location || !formData.location.lat || !formData.location.lon) {
+        throw new Error('Localisation incomplète. Veuillez sélectionner un lieu.');
+      }
 
-      console.log("Données envoyées au back:", formData);
+      // Préparer les données pour l'API
+      const requestData = {
+        location: {
+          city: formData.location.city || '',
+          postcode: formData.location.postcode || '',
+          lat: formData.location.lat,
+          lon: formData.location.lon,
+          label: formData.location.label || ''
+        },
+        radius: formData.radius || 20,
+        sector: formData.sector || ''
+      };
 
-      // Simulation de données pour la démo
-      setTimeout(() => {
-        const mockResults = [
-          {
-            id: 1,
-            name: "Tech Solutions Bordeaux",
-            email: "contact@techsolutions.fr",
-            address: "12 Rue des Innovations, 33000 Bordeaux",
-            sector: "Informatique / Tech",
-            phone: "05 56 00 00 00",
-            website: "https://techsolutions.fr"
+      console.log('🔍 Envoi de la requête API:', requestData);
+
+      // Appel API vers le backend avec timeout plus long pour l'enrichissement
+      const response = await axios.post(
+        `${API_BASE_URL}/api/companies/search`,
+        requestData,
+        {
+          headers: {
+            'Content-Type': 'application/json'
           },
-          {
-            id: 2,
-            name: "BTP Aquitaine",
-            email: "info@btp-aquitaine.com",
-            address: "45 Avenue de la Marne, 33700 Mérignac",
-            sector: "BTP / Construction",
-            phone: "05 57 11 22 33"
-          },
-          {
-            id: 3,
-            name: "Green Energy Services",
-            email: "jobs@greenenergy.fr",
-            address: "2 Place de la Bourse, 33000 Bordeaux",
-            sector: "Industrie",
-            website: "https://greenenergy.fr"
-          }
-        ];
-        setResults(mockResults);
-        setLoading(false);
-      }, 1000);
+          timeout: 300000 // 5 minutes pour permettre l'enrichissement
+        }
+      );
+
+      console.log('✅ Réponse API reçue:', response.data);
+
+      const companies = response.data.companies || [];
+      
+      console.log(`📊 ${companies.length} entreprises trouvées`);
+      
+      // Afficher les statistiques si disponibles
+      if (response.data.stats) {
+        console.log(`   - ${response.data.stats.withEmail} avec email`);
+        console.log(`   - ${response.data.stats.withPhone} avec téléphone`);
+        console.log(`   - ${response.data.stats.withBoth} avec email ET téléphone`);
+      }
+
+      setResults(companies);
+      setLoading(false);
+
+      // Afficher un message si aucun résultat
+      if (companies.length === 0) {
+        setError('Aucune entreprise trouvée dans cette zone.');
+      }
 
     } catch (err) {
-      setError("Une erreur est survenue lors de la recherche.");
+      console.error('❌ Erreur recherche:', err);
+      
+      let errorMessage = "Une erreur est survenue lors de la recherche.";
+      
+      if (err.response) {
+        // Erreur HTTP
+        errorMessage = err.response.data?.error || err.response.data?.message || `Erreur ${err.response.status}`;
+        console.error('Détails erreur:', err.response.data);
+      } else if (err.request) {
+        // Pas de réponse du serveur
+        errorMessage = "Impossible de contacter le serveur. Vérifiez que le backend est démarré.";
+        console.error('Pas de réponse du serveur');
+      } else if (err.message) {
+        // Erreur de validation
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       setLoading(false);
+      setResults([]);
     }
   };
 
   return { results, loading, error, performSearch };
 };
-

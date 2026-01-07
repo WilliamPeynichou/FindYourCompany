@@ -1,4 +1,4 @@
-# FindYourCompany - Client
+# TrouveTaBoite - Client
 
 Application React avec Vite, React Router DOM et Tailwind CSS.
 

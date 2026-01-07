@@ -1,6 +1,6 @@
-# FindYourCompany
+# TrouveTaBoite
 
-Plateforme web permettant aux professionnels et étudiants de rechercher des entreprises par localisation et secteur d'activité, avec accès aux coordonnées complètes (nom, email, adresse, téléphone).
+Plateforme web permettant aux professionnels et étudiants de rechercher des entreprises par localisation et secteur d'activité via l'API Sirene officielle de l'INSEE. Accès aux informations officielles : nom, adresse, SIRET, secteur d'activité.
 
 ## 🚀 Technologies
 
@@ -21,7 +21,7 @@ Plateforme web permettant aux professionnels et étudiants de rechercher des ent
 ## 📁 Structure du projet
 
 ```
-FindYourCompany/
+TrouveTaBoite/
 ├── client/          # Application React frontend
 ├── server/          # API Node.js backend
 └── README.md        # Ce fichier
@@ -82,6 +82,9 @@ DB_PORT=5432
 DB_NAME=findyourcompany_db
 DB_USER=postgres
 DB_PASSWORD=postgres
+
+# Clé API INSEE Sirene (obtenir sur https://api.insee.fr/)
+INSEE_API_KEY=votre_cle_api_ici
 ```
 
 ## 🎯 Fonctionnalités
@@ -90,12 +93,12 @@ DB_PASSWORD=postgres
 - ✅ Filtrage par rayon de recherche (5km à 200km)
 - ✅ Filtrage par secteur d'activité
 - ✅ Visualisation sur carte interactive (Leaflet)
-- ✅ Affichage des résultats avec coordonnées complètes
+- ✅ Affichage des résultats avec informations officielles (nom, adresse, secteur, SIRET)
 - ✅ Export des résultats en CSV (à venir)
 
-## 🔄 Workflow n8n
+## 🔄 Source de données
 
-Le projet utilise n8n pour automatiser le scraping des données d'entreprises depuis PagesJaunes et autres sources, avec extraction structurée via LLM.
+Le projet utilise l'API Sirene officielle de l'INSEE pour récupérer les données d'entreprises. Les informations sont officielles et à jour, mais ne contiennent pas d'emails ni de numéros de téléphone (non disponibles dans Sirene).
 
 ## 📄 Licence
 

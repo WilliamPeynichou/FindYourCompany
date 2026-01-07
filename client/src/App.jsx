@@ -4,14 +4,14 @@ import { ResultsList } from './features/search/components/ResultsList';
 import { useSearch } from './features/search/hooks/useSearch';
 
 function App() {
-  const { results, loading, performSearch } = useSearch();
+  const { results, loading, error, performSearch } = useSearch();
 
   return (
     <div className="min-h-screen nothing-bg font-sans text-black">
       {/* Header Minimaliste */}
       <nav className="border-b border-zinc-200 py-4 px-8 bg-white">
         <div className="nothing-dot-font text-lg font-black tracking-tighter">
-          FINDYOURCOMPANY<span className="text-red-600">.</span>
+          TROUVETABOITE<span className="text-red-600">.</span>
         </div>
       </nav>
 
@@ -31,6 +31,13 @@ function App() {
           <SearchForm onSearch={performSearch} loading={loading} />
         </div>
 
+        {/* Messages d'erreur */}
+        {error && (
+          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm font-medium">{error}</p>
+          </div>
+        )}
+
         {/* Résultats */}
         <section>
           <ResultsList results={results || []} loading={loading} />
@@ -40,7 +47,7 @@ function App() {
       {/* Footer Minimaliste */}
       <footer className="border-t border-zinc-200 py-8 px-8 bg-zinc-50">
         <div className="max-w-6xl mx-auto nothing-dot-font text-[9px] text-zinc-400 text-center">
-          © 2026 FINDYOURCOMPANY. TOUS DROITS RÉSERVÉS.
+          © 2026 TROUVETABOITE. TOUS DROITS RÉSERVÉS.
         </div>
       </footer>
     </div>
