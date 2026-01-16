@@ -63,9 +63,15 @@ export const ResultsList = ({ results, loading }) => {
                     )}
                   </div>
                 )}
+                {/* Afficher la distance si disponible */}
+                {company.distance !== undefined && company.distance !== null && (
+                  <div className="text-xs text-blue-600 mt-1">
+                    📍 {company.distance} km
+                  </div>
+                )}
                 {!company.email && !company.phone && (
                   <div className="text-xs text-zinc-400 italic">
-                    Coordonnées non disponibles dans Sirene
+                    Coordonnées non disponibles
                   </div>
                 )}
               </div>

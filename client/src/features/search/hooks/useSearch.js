@@ -6,21 +6,31 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' :
 
 /**
  * Hook pour gérer la logique de recherche
+ * Utilise l'API Recherche Entreprises (data.gouv.fr) - GRATUITE
  */
 export const useSearch = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [source, setSource] = useState(null);
 
   const performSearch = async (formData) => {
     setLoading(true);
     setError(null);
     setResults([]);
+    setStats(null);
+    setSource(null);
     
     try {
       // Vérifier que les données requises sont présentes
-      if (!formData.location || !formData.location.lat || !formData.location.lon) {
+      if (!formData.location) {
         throw new Error('Localisation incomplète. Veuillez sélectionner un lieu.');
+      }
+
+      // Ville ou code postal requis
+      if (!formData.location.postcode && !formData.location.city) {
+        throw new Error('Ville ou code postal requis pour la recherche.');
       }
 
       // Préparer les données pour l'API
@@ -28,39 +38,45 @@ export const useSearch = () => {
         location: {
           city: formData.location.city || '',
           postcode: formData.location.postcode || '',
-          lat: formData.location.lat,
-          lon: formData.location.lon,
+          lat: formData.location.lat || '',
+          lon: formData.location.lon || '',
           label: formData.location.label || ''
         },
-        radius: formData.radius || 20,
+        radius: formData.radius || 5,
         sector: formData.sector || ''
       };
 
-      console.log('🔍 Envoi de la requête API:', requestData);
+      console.log('🔍 Envoi de la requête API Gouv:', requestData);
 
-      // Appel API vers le backend avec timeout plus long pour l'enrichissement
+      // Appel API vers le backend - utilise la route API Gouv (gratuite)
       const response = await axios.post(
-        `${API_BASE_URL}/api/companies/search`,
+        `${API_BASE_URL}/api/companies/search-gouv`,
         requestData,
         {
           headers: {
             'Content-Type': 'application/json'
           },
-          timeout: 300000 // 5 minutes pour permettre l'enrichissement
+          timeout: 60000 // 1 minute
         }
       );
 
-      console.log('✅ Réponse API reçue:', response.data);
+      console.log('✅ Réponse API Gouv reçue:', response.data);
 
       const companies = response.data.companies || [];
       
       console.log(`📊 ${companies.length} entreprises trouvées`);
       
-      // Afficher les statistiques si disponibles
+      // Sauvegarder les statistiques
       if (response.data.stats) {
-        console.log(`   - ${response.data.stats.withEmail} avec email`);
-        console.log(`   - ${response.data.stats.withPhone} avec téléphone`);
-        console.log(`   - ${response.data.stats.withBoth} avec email ET téléphone`);
+        setStats(response.data.stats);
+        console.log(`   - ${response.data.stats.total} total`);
+        console.log(`   - ${response.data.stats.withCoordinates} avec coordonnées`);
+        console.log(`   - ${response.data.stats.withDirigeants} avec dirigeants`);
+      }
+
+      // Sauvegarder la source
+      if (response.data.source) {
+        setSource(response.data.source);
       }
 
       setResults(companies);
@@ -95,5 +111,5 @@ export const useSearch = () => {
     }
   };
 
-  return { results, loading, error, performSearch };
+  return { results, loading, error, stats, source, performSearch };
 };

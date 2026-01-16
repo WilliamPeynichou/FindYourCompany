@@ -60,9 +60,23 @@ app.get('/api/health', (req, res) => {
 const companiesRoutes = require('./routes/companies');
 app.use('/api/companies', companiesRoutes);
 
+// Vérification des variables d'environnement critiques
+const requiredEnvVars = {
+  PAPPERS_API_TOKEN: process.env.PAPPERS_API_TOKEN,
+  INSEE_API_KEY: process.env.INSEE_API_KEY
+};
+
+console.log('\n📋 Configuration:');
+console.log(`   Port: ${PORT}`);
+console.log(`   PAPPERS_API_TOKEN: ${requiredEnvVars.PAPPERS_API_TOKEN ? '✅ Défini' : '⚠️  NON DÉFINI (requis pour /search-pappers)'}`);
+console.log(`   INSEE_API_KEY: ${requiredEnvVars.INSEE_API_KEY ? '✅ Défini' : '⚠️  NON DÉFINI (requis pour /search)'}`);
+console.log('');
+
 // Démarrage du serveur
 app.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
+  console.log(`✅ Serveur démarré sur le port ${PORT}`);
+  console.log(`   API disponible sur http://localhost:${PORT}`);
+  console.log(`   Health check: http://localhost:${PORT}/api/health\n`);
 });
 
 module.exports = app;
