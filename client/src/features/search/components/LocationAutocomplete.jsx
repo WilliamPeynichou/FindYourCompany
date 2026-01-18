@@ -10,46 +10,6 @@ export const LocationAutocomplete = ({ value, onSelect, error }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  /**
-   * Extrait l'arrondissement du code postal ou du nom
-   * Paris: 75001-75020 = 1er-20e arrondissement
-   * Lyon: 69001-69009 = 1er-9e arrondissement
-   * Marseille: 13001-13016 = 1er-16e arrondissement
-   */
-  const extractArrondissement = useCallback((postcode, suburb, city) => {
-    if (!postcode || postcode.length !== 5) return null;
-    
-    const code = parseInt(postcode);
-    
-    // Paris (75001-75020)
-    if (city === 'Paris' && code >= 75001 && code <= 75020) {
-      const arrNum = code - 75000;
-      if (arrNum === 1) return '1er Arrondissement';
-      return `${arrNum}e Arrondissement`;
-    }
-    
-    // Lyon (69001-69009)
-    if (city === 'Lyon' && code >= 69001 && code <= 69009) {
-      const arrNum = code - 69000;
-      if (arrNum === 1) return '1er Arrondissement';
-      return `${arrNum}e Arrondissement`;
-    }
-    
-    // Marseille (13001-13016)
-    if (city === 'Marseille' && code >= 13001 && code <= 13016) {
-      const arrNum = code - 13000;
-      if (arrNum === 1) return '1er Arrondissement';
-      return `${arrNum}e Arrondissement`;
-    }
-    
-    // Si le suburb contient déjà "Arrondissement", l'utiliser
-    if (suburb && suburb.includes('Arrondissement')) {
-      return suburb;
-    }
-    
-    return null;
-  }, []);
-
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -62,134 +22,150 @@ export const LocationAutocomplete = ({ value, onSelect, error }) => {
 
   useEffect(() => {
     const fetchSuggestions = async (val) => {
-      if (val.length < 3) return;
+      if (val.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+      
       setLoading(true);
       try {
-        const normalizedQuery = val.toLowerCase().trim();
-        const isParis = normalizedQuery.includes('paris') && !normalizedQuery.match(/paris\s+\d/);
-        const isLyon = normalizedQuery.includes('lyon') && !normalizedQuery.match(/lyon\s+\d/);
-        const isMarseille = normalizedQuery.includes('marseille') && !normalizedQuery.match(/marseille\s+\d/);
-        
-        // Si on cherche Paris, Lyon ou Marseille sans numéro, chercher aussi les arrondissements
-        let searchQueries = [val];
-        if (isParis) {
-          searchQueries.push('Paris 75001', 'Paris 75008', 'Paris 75016');
-        } else if (isLyon) {
-          searchQueries.push('Lyon 69001', 'Lyon 69002', 'Lyon 69003');
-        } else if (isMarseille) {
-          searchQueries.push('Marseille 13001', 'Marseille 13008', 'Marseille 13016');
-        }
-        
-        // Faire les recherches en parallèle
-        const allPromises = searchQueries.map(query => 
-          axios.get(
-            `https://nominatim.openstreetmap.org/search`,
-            {
-              params: {
-                format: 'json',
-                q: query,
-                addressdetails: 1,
-                limit: isParis || isLyon || isMarseille ? 3 : 8,
-                countrycodes: 'fr',
-                extratags: 1,
-                namedetails: 1
-              },
-              headers: {
-                'User-Agent': 'TrouveTaBoite/1.0'
-              }
-            }
-          )
-        );
-        
-        const responses = await Promise.all(allPromises);
-        
-        // Fusionner tous les résultats
-        let allResults = [];
-        responses.forEach(response => {
-          allResults = allResults.concat(response.data);
+        // Utiliser l'API Geo gouv.fr pour les communes françaises
+        // Cette API retourne uniquement des communes avec codes postaux
+        const response = await axios.get('https://geo.api.gouv.fr/communes', {
+          params: {
+            nom: val,
+            fields: 'nom,code,codesPostaux,centre,departement,region,population',
+            boost: 'population', // Privilégier les grandes villes
+            limit: 15
+          }
         });
+
+        // Transformer les résultats pour avoir une entrée par code postal
+        const results = [];
         
-        // Dédupliquer par place_id
-        const uniqueResults = Array.from(
-          new Map(allResults.map(item => [item.place_id, item])).values()
-        );
-        
-        // Filtrer et trier les résultats pour privilégier ceux avec codes postaux
-        const sortedSuggestions = uniqueResults
-          .filter(item => {
-            const city = item.address?.city || item.address?.town || '';
-            // Pour Paris/Lyon/Marseille, privilégier les arrondissements
-            if ((isParis && city === 'Paris') || (isLyon && city === 'Lyon') || (isMarseille && city === 'Marseille')) {
-              const postcode = item.address?.postcode || '';
-              const arrondissement = extractArrondissement(postcode, item.address?.suburb || '', city);
-              return arrondissement !== null || postcode.length === 5;
+        for (const commune of response.data) {
+          // Si la commune a plusieurs codes postaux, créer une entrée pour chacun
+          if (commune.codesPostaux && commune.codesPostaux.length > 0) {
+            for (const codePostal of commune.codesPostaux) {
+              results.push({
+                nom: commune.nom,
+                codePostal: codePostal,
+                codeCommune: commune.code,
+                departement: commune.departement?.nom || '',
+                codeDepartement: commune.departement?.code || '',
+                region: commune.region?.nom || '',
+                population: commune.population || 0,
+                centre: commune.centre
+              });
             }
-            return true;
-          })
-          .sort((a, b) => {
-            const aHasPostcode = a.address?.postcode ? 1 : 0;
-            const bHasPostcode = b.address?.postcode ? 1 : 0;
-            const aHasArr = extractArrondissement(a.address?.postcode || '', a.address?.suburb || '', a.address?.city || '') ? 1 : 0;
-            const bHasArr = extractArrondissement(b.address?.postcode || '', b.address?.suburb || '', b.address?.city || '') ? 1 : 0;
-            return (bHasPostcode + bHasArr) - (aHasPostcode + aHasArr);
-          })
-          .slice(0, 8); // Limiter à 8 résultats finaux
-        
-        setSuggestions(sortedSuggestions);
+          }
+        }
+
+        // Trier par population (grandes villes en premier) puis par code postal
+        results.sort((a, b) => {
+          if (b.population !== a.population) {
+            return b.population - a.population;
+          }
+          return a.codePostal.localeCompare(b.codePostal);
+        });
+
+        // Limiter à 10 résultats
+        setSuggestions(results.slice(0, 10));
         setIsOpen(true);
       } catch (err) {
+        console.error('Erreur recherche communes:', err);
         setSuggestions([]);
       } finally {
         setLoading(false);
       }
     };
 
-    if (query.length >= 3) {
-      const timeoutId = setTimeout(() => fetchSuggestions(query), 300);
+    if (query.length >= 2) {
+      const timeoutId = setTimeout(() => fetchSuggestions(query), 250);
       return () => clearTimeout(timeoutId);
+    } else {
+      setSuggestions([]);
     }
-  }, [query, extractArrondissement]);
+  }, [query]);
 
-  const handleSelect = (item) => {
-    const city = item.address.city || item.address.town || item.address.municipality || '';
-    const postcode = item.address.postcode || '';
-    const suburb = item.address.suburb || item.address.city_district || '';
-    
-    // Extraire l'arrondissement du code postal ou du suburb
-    const arrondissement = extractArrondissement(postcode, suburb, city);
-    
-    // Construire le label avec ville, arrondissement (si présent) et code postal
-    let labelParts = [city];
-    
-    // Ajouter l'arrondissement si présent
-    if (arrondissement) {
-      // Formater l'arrondissement de manière plus courte pour le label
-      const arrShort = arrondissement.replace(' Arrondissement', '');
-      labelParts.push(arrShort);
+  /**
+   * Récupère les coordonnées GPS d'une commune via l'API Adresse
+   */
+  const getCoordinates = async (commune) => {
+    try {
+      // Utiliser le centre de la commune si disponible
+      if (commune.centre && commune.centre.coordinates) {
+        return {
+          lon: commune.centre.coordinates[0],
+          lat: commune.centre.coordinates[1]
+        };
+      }
+      
+      // Sinon, géocoder avec l'API Adresse
+      const response = await axios.get('https://api-adresse.data.gouv.fr/search/', {
+        params: {
+          q: `${commune.nom} ${commune.codePostal}`,
+          type: 'municipality',
+          limit: 1
+        }
+      });
+
+      if (response.data.features && response.data.features.length > 0) {
+        const coords = response.data.features[0].geometry.coordinates;
+        return { lon: coords[0], lat: coords[1] };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Erreur géocodage:', error);
+      return null;
     }
+  };
+
+  const handleSelect = async (commune) => {
+    setLoading(true);
     
-    // Ajouter le code postal
-    if (postcode) {
-      labelParts.push(`(${postcode})`);
+    // Récupérer les coordonnées
+    const coords = await getCoordinates(commune);
+    
+    if (!coords) {
+      console.error('Impossible de récupérer les coordonnées');
+      setLoading(false);
+      return;
     }
-    
-    const label = labelParts.join(' ');
+
+    // Construire le label
+    const label = `${commune.nom} (${commune.codePostal})`;
     
     onSelect({
       label,
-      lat: item.lat,
-      lon: item.lon,
-      postcode: postcode,
-      city: city,
-      suburb: arrondissement || suburb || null
+      lat: coords.lat.toString(),
+      lon: coords.lon.toString(),
+      postcode: commune.codePostal,
+      city: commune.nom,
+      codeCommune: commune.codeCommune,
+      departement: commune.departement,
+      codeDepartement: commune.codeDepartement
     });
+    
     setQuery('');
     setIsOpen(false);
+    setLoading(false);
+  };
+
+  /**
+   * Formatte la population pour l'affichage
+   */
+  const formatPopulation = (pop) => {
+    if (!pop) return '';
+    if (pop >= 1000000) return `${(pop / 1000000).toFixed(1)}M hab.`;
+    if (pop >= 1000) return `${(pop / 1000).toFixed(0)}k hab.`;
+    return `${pop} hab.`;
   };
 
   return (
     <div className="w-full" ref={dropdownRef}>
-      {/* Barre de recherche style image */}
+      {/* Barre de recherche */}
       {!value && (
         <div className="relative">
           <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-800" />
@@ -197,7 +173,7 @@ export const LocationAutocomplete = ({ value, onSelect, error }) => {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ajouter une localisation"
+            placeholder="Rechercher une ville..."
             className={cn(
               "w-full pl-12 pr-10 py-3.5 rounded-full border border-zinc-300 focus:border-blue-500 focus:outline-none transition-all text-lg shadow-sm",
               error && "border-red-500"
@@ -206,44 +182,42 @@ export const LocationAutocomplete = ({ value, onSelect, error }) => {
           {loading && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 animate-spin" />}
           
           {isOpen && suggestions.length > 0 && (
-            <ul className="absolute z-[1001] w-full mt-2 bg-white border border-zinc-200 rounded-2xl shadow-xl max-h-60 overflow-auto py-2">
-              {suggestions.map((item, idx) => {
-                const city = item.address.city || item.address.town || item.address.municipality || item.display_name;
-                const postcode = item.address.postcode || '';
-                const suburb = item.address.suburb || item.address.city_district || '';
-                
-                // Extraire l'arrondissement pour l'affichage
-                const arrondissement = extractArrondissement(postcode, suburb, city);
-                const isParisLyonMarseille = city === 'Paris' || city === 'Lyon' || city === 'Marseille';
-                
-                return (
-                  <li
-                    key={idx}
-                    onClick={() => handleSelect(item)}
-                    className="px-6 py-3 hover:bg-zinc-50 cursor-pointer text-sm border-b border-zinc-50 last:border-b-0"
-                  >
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-zinc-900">{city}</span>
-                        {isParisLyonMarseille && arrondissement && (
-                          <span className="text-zinc-600 text-xs font-semibold bg-blue-50 px-2 py-0.5 rounded">
-                            {arrondissement.replace(' Arrondissement', '')}
-                          </span>
-                        )}
-                        {postcode && (
-                          <span className="ml-auto text-zinc-500 text-xs font-mono bg-zinc-100 px-2 py-0.5 rounded">
-                            {postcode}
-                          </span>
-                        )}
+            <ul className="absolute z-[1001] w-full mt-2 bg-white border border-zinc-200 rounded-2xl shadow-xl max-h-80 overflow-auto py-2">
+              {suggestions.map((commune, idx) => (
+                <li
+                  key={`${commune.codeCommune}-${commune.codePostal}-${idx}`}
+                  onClick={() => handleSelect(commune)}
+                  className="px-5 py-3 hover:bg-blue-50 cursor-pointer border-b border-zinc-50 last:border-b-0 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-zinc-900 truncate">
+                          {commune.nom}
+                        </span>
+                        <span className="text-xs font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-medium">
+                          {commune.codePostal}
+                        </span>
                       </div>
-                      {item.address.state && (
-                        <span className="text-zinc-400 text-xs mt-0.5">{item.address.state}</span>
-                      )}
+                      <span className="text-xs text-zinc-500 truncate">
+                        {commune.departement}{commune.codeDepartement ? ` (${commune.codeDepartement})` : ''}
+                      </span>
                     </div>
-                  </li>
-                );
-              })}
+                    {commune.population > 0 && (
+                      <span className="text-xs text-zinc-400 whitespace-nowrap">
+                        {formatPopulation(commune.population)}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
             </ul>
+          )}
+          
+          {isOpen && query.length >= 2 && suggestions.length === 0 && !loading && (
+            <div className="absolute z-[1001] w-full mt-2 bg-white border border-zinc-200 rounded-2xl shadow-xl py-4 px-5 text-center text-zinc-500 text-sm">
+              Aucune commune trouvée pour "{query}"
+            </div>
           )}
         </div>
       )}
@@ -251,6 +225,7 @@ export const LocationAutocomplete = ({ value, onSelect, error }) => {
       {/* Chip de localisation sélectionnée */}
       {value && (
         <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 px-4 py-2 rounded-xl border border-blue-100 mb-4 animate-in fade-in zoom-in duration-300">
+          <MapPin className="w-4 h-4" />
           <span className="text-sm font-medium">{value.label}</span>
           <button 
             onClick={() => onSelect(null)}

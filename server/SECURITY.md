@@ -1,112 +1,142 @@
-# Mesures de Sécurité - TrouveTaBoite
+# 🔒 Politique de Sécurité - TrouveTaBoite API
 
-Ce document décrit les mesures de sécurité mises en place pour protéger l'application contre les injections SQL et les attaques XSS.
+## Vue d'ensemble
 
-## 🛡️ Protection contre les Injections SQL
+Ce document décrit les mesures de sécurité implémentées dans l'API TrouveTaBoite.
 
-### 1. Utilisation de Sequelize ORM
-- **Sequelize** utilise des requêtes paramétrées par défaut, ce qui empêche les injections SQL
-- Toutes les requêtes à la base de données utilisent des placeholders (`?`) au lieu de concaténation de chaînes
+## Mesures de sécurité implémentées
 
-### 2. Validation et Sanitization des Entrées
-- **express-validator** valide et sanitize toutes les entrées utilisateur
-- Les paramètres sont nettoyés avant d'être utilisés dans les requêtes
-- Validation stricte des types de données (nombres, chaînes, formats)
+### 1. Protection des Headers HTTP (Helmet)
 
-### 3. Protection dans sireneService.js
-- Nettoyage des codes postaux (uniquement chiffres)
-- Échappement des noms de villes (suppression des guillemets)
-- Validation des codes APE/NAF (format numérique strict)
+```javascript
+app.use(helmet({
+  contentSecurityPolicy: {...},
+  hsts: true,
+  noSniff: true,
+  xssFilter: true,
+  hidePoweredBy: true,
+}));
+```
 
-## 🔒 Protection contre les Attaques XSS
+**Headers configurés :**
+- `Content-Security-Policy` : Limite les sources de contenu
+- `Strict-Transport-Security` : Force HTTPS en production
+- `X-Content-Type-Options: nosniff` : Empêche le MIME sniffing
+- `X-Frame-Options: DENY` : Empêche le clickjacking
+- `X-XSS-Protection: 1; mode=block` : Protection XSS navigateur
 
-### 1. Côté Serveur (Backend)
+### 2. Rate Limiting
 
-#### Helmet.js
-- Headers HTTP sécurisés configurés via **Helmet**
-- Content Security Policy (CSP) pour limiter l'exécution de scripts
-- Protection contre le clickjacking
-- Headers XSS Protection activés
+```javascript
+// Limite globale : 100 req/15min en prod
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+});
 
-#### Sanitization des Données
-- Tous les champs texte sont sanitizés avant stockage
-- Suppression des caractères HTML dangereux (`<`, `>`, `"`, `'`)
-- Validation des formats (email, téléphone, URL)
+// Limite recherche : 10 req/min en prod
+const searchLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 10
+});
+```
 
-### 2. Côté Client (Frontend)
+### 3. Validation des entrées (express-validator)
 
-#### Validation Zod
-- Schéma de validation strict avec **Zod**
-- Vérification des formats (latitude, longitude, code postal)
-- Limitation de la longueur des chaînes
-- Regex pour valider les caractères autorisés
+Toutes les entrées utilisateur sont :
+- Validées avec des règles strictes
+- Sanitizées pour supprimer les caractères dangereux
+- Limitées en longueur
+- Vérifiées contre une whitelist (secteurs)
 
-#### Échappement HTML
-- Fonction `escapeHtml()` pour échapper tous les caractères HTML
-- Utilisation systématique dans `ResultsList.jsx`
-- Sanitization des URLs, emails et téléphones avant affichage
+### 4. Protection CORS
 
-#### Protection des Liens
-- Validation des URLs avant création de liens (`sanitizeUrl()`)
-- Validation des emails avant `mailto:` (`sanitizeEmail()`)
-- Nettoyage des numéros de téléphone (`sanitizePhone()`)
-- Attribut `rel="noreferrer noopener"` sur les liens externes
+```javascript
+app.use(cors({
+  origin: dynamicOriginCheck,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true
+}));
+```
 
-## 📋 Validations Mises en Place
+### 5. Limitation des payloads
 
-### Paramètres de Recherche
+- Taille maximale : 100KB (réduit de 10MB)
+- Nombre de paramètres limité
+- JSON strict uniquement
 
-#### Localisation
-- **Latitude** : Nombre entre -90 et 90, formaté à 8 décimales
-- **Longitude** : Nombre entre -180 et 180, formaté à 8 décimales
-- **Ville** : Max 100 caractères, uniquement lettres, espaces, tirets, apostrophes
-- **Code postal** : Exactement 5 chiffres
-- **Label** : Max 200 caractères, caractères HTML échappés
+### 6. Sanitization des réponses
 
-#### Rayon
-- Nombre entier entre 0 et 200 km
-- Valeur par défaut : 20 km si non spécifié
+Toutes les données retournées sont sanitizées :
+- URLs validées
+- Emails validés
+- Téléphones nettoyés
+- Longueurs limitées
+- Pas de données inattendues
 
-#### Secteur
-- Max 100 caractères
-- Caractères autorisés : lettres, chiffres, espaces, `/`, `-`, `.`
-- Caractères HTML échappés
+### 7. Gestion sécurisée des erreurs
 
-## 🔐 Headers de Sécurité (Helmet)
+- Pas de stack traces en production
+- Messages d'erreur génériques
+- Logging sécurisé sans données sensibles
 
-- **Content-Security-Policy** : Limite les sources de contenu autorisées
-- **X-Content-Type-Options** : Empêche le MIME-sniffing
-- **X-Frame-Options** : Protection contre le clickjacking
-- **X-XSS-Protection** : Activation de la protection XSS du navigateur
-- **Strict-Transport-Security** : Force HTTPS en production
+## Variables d'environnement requises
 
-## 📝 Bonnes Pratiques Appliquées
+```env
+# Mode de l'application
+NODE_ENV=production
 
-1. **Validation côté client ET serveur** : Double validation pour sécurité maximale
-2. **Principe du moindre privilège** : Validation stricte des formats attendus
-3. **Échappement systématique** : Toutes les données utilisateur sont échappées avant affichage
-4. **Limitation de taille** : Limite de 10MB pour les requêtes JSON
-5. **Logs sécurisés** : Les données sensibles ne sont pas loggées
+# Origins autorisées (séparées par des virgules)
+ALLOWED_ORIGINS=https://monsite.com,https://www.monsite.com
 
-## ⚠️ Notes Importantes
+# Tokens API (ne jamais commiter !)
+PAPPERS_API_TOKEN=votre_token
+INSEE_API_KEY=votre_cle
+```
 
-- Les validations sont appliquées **avant** le traitement des données
-- Les erreurs de validation retournent des messages clairs sans exposer la structure interne
-- Les données sanitizées sont utilisées dans toutes les requêtes
-- Sequelize protège automatiquement contre les injections SQL via les requêtes paramétrées
+## Bonnes pratiques
 
-## 🧪 Tests de Sécurité Recommandés
+### À faire
 
-1. Tester avec des payloads XSS : `<script>alert('XSS')</script>`
-2. Tester avec des injections SQL : `'; DROP TABLE companies; --`
-3. Tester avec des caractères spéciaux : `<>"'&`
-4. Tester avec des valeurs hors limites : latitude > 90, rayon > 200
-5. Tester avec des formats invalides : code postal avec lettres
+- ✅ Toujours utiliser HTTPS en production
+- ✅ Définir `NODE_ENV=production` en prod
+- ✅ Configurer `ALLOWED_ORIGINS` correctement
+- ✅ Garder les dépendances à jour
+- ✅ Surveiller les logs pour les tentatives d'attaque
 
-## 📚 Références
+### À ne pas faire
 
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Express Security Best Practices](https://expressjs.com/en/advanced/best-practice-security.html)
-- [Helmet.js Documentation](https://helmetjs.github.io/)
-- [express-validator Documentation](https://express-validator.github.io/docs/)
+- ❌ Ne jamais commiter les fichiers `.env`
+- ❌ Ne jamais exposer les tokens API
+- ❌ Ne jamais désactiver la validation
+- ❌ Ne jamais logger les données sensibles
+- ❌ Ne jamais faire confiance aux données utilisateur
 
+## Audit des dépendances
+
+Exécutez régulièrement :
+
+```bash
+npm audit
+npm audit fix
+```
+
+## Signalement de vulnérabilités
+
+Si vous découvrez une vulnérabilité, veuillez :
+1. Ne pas la divulguer publiquement
+2. Contacter l'équipe de développement
+3. Fournir les détails techniques
+4. Attendre le correctif avant divulgation
+
+## Changelog sécurité
+
+### v1.1.0 (2026-01-18)
+- ✅ Ajout du rate limiting
+- ✅ Validation whitelist des secteurs
+- ✅ Sanitization des réponses API
+- ✅ Amélioration des headers de sécurité
+- ✅ Logging sécurisé sans données sensibles
+- ✅ Gestion des erreurs sécurisée
+- ✅ Limitation de la taille des payloads
+- ✅ Validation renforcée des coordonnées GPS
