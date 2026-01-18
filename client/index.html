@@ -1,18 +1,98 @@
 <!doctype html>
 <html lang="fr">
   <head>
+    <!-- Encodage et Viewport -->
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="TrouveTaBoite - Trouvez des entreprises par localisation et secteur d'activité en France" />
-    <title>TrouveTaBoite - Trouvez des entreprises</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     
-    <!-- Google AdSense - Annonces Automatiques -->
-    <!-- REMPLACEZ ca-pub-XXXXXXXXXXXXXXXX par votre ID éditeur AdSense -->
+    <!-- Titre et Description SEO -->
+    <title>TrouveTaBoite - Trouvez des entreprises par localisation en France</title>
+    <meta name="description" content="Recherchez et trouvez des entreprises par localisation et secteur d'activité en France. Accédez aux informations officielles : nom, adresse, SIRET, secteur. Gratuit et rapide." />
+    <meta name="keywords" content="entreprise, recherche entreprise, trouver entreprise, localisation, secteur activité, SIRET, annuaire entreprises, France, prospection, B2B" />
+    <meta name="author" content="TrouveTaBoite" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="French" />
+    <meta name="revisit-after" content="7 days" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://trouvetaboite.fr/" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://trouvetaboite.fr/" />
+    <meta property="og:title" content="TrouveTaBoite - Trouvez des entreprises par localisation" />
+    <meta property="og:description" content="Recherchez et trouvez des entreprises par localisation et secteur d'activité en France. Accédez aux informations officielles gratuitement." />
+    <meta property="og:image" content="https://trouvetaboite.fr/og-image.svg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:site_name" content="TrouveTaBoite" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://trouvetaboite.fr/" />
+    <meta name="twitter:title" content="TrouveTaBoite - Trouvez des entreprises par localisation" />
+    <meta name="twitter:description" content="Recherchez et trouvez des entreprises par localisation et secteur d'activité en France. Gratuit et rapide." />
+    <meta name="twitter:image" content="https://trouvetaboite.fr/og-image.svg" />
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#18181b" />
+    <meta name="msapplication-TileColor" content="#18181b" />
+    
+    <!-- Preconnect pour performance -->
+    <link rel="preconnect" href="https://geo.api.gouv.fr" />
+    <link rel="preconnect" href="https://recherche-entreprises.api.gouv.fr" />
+    <link rel="preconnect" href="https://pagead2.googlesyndication.com" />
+    <link rel="dns-prefetch" href="https://geo.api.gouv.fr" />
+    <link rel="dns-prefetch" href="https://recherche-entreprises.api.gouv.fr" />
+    
+    <!-- Structured Data / Schema.org -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "TrouveTaBoite",
+      "description": "Recherchez et trouvez des entreprises par localisation et secteur d'activité en France",
+      "url": "https://trouvetaboite.fr",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "William Peynichou"
+      },
+      "inLanguage": "fr-FR",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://trouvetaboite.fr/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    
+    <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9331269623257147"
      crossorigin="anonymous"></script>
   </head>
   <body>
+    <!-- Noscript fallback -->
+    <noscript>
+      <div style="padding: 20px; text-align: center; font-family: sans-serif;">
+        <h1>TrouveTaBoite</h1>
+        <p>Cette application nécessite JavaScript pour fonctionner correctement.</p>
+        <p>Veuillez activer JavaScript dans votre navigateur.</p>
+      </div>
+    </noscript>
+    
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
