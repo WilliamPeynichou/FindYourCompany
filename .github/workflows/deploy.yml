@@ -46,7 +46,19 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          # Désactiver la vérification stricte des clés (plus simple)
+          cat >> ~/.ssh/config << EOF
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            LogLevel ERROR
+          EOF
+          chmod 600 ~/.ssh/config
+      
+      - name: 🔍 Debug - Test SSH connection
+        run: |
+          echo "Testing SSH connection to ${{ secrets.SSH_HOST }}..."
+          ssh -i ~/.ssh/deploy_key -o ConnectTimeout=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH connection successful!'"
       
       - name: 📤 Upload archives to server
         run: |
@@ -74,16 +86,13 @@ jobs:
             
             echo ""
             echo "🎉 Déploiement terminé !"
-            echo "🌐 Frontend: https://trouvetaboite.com"
-            echo "🔧 Backend: ~/nodejs/trouvetaboite-api"
-            echo ""
-            echo "⚠️  N'oubliez pas de redémarrer l'app Node.js dans cPanel !"
           ENDSSH
       
       - name: 🧹 Cleanup
         if: always()
         run: |
           rm -f ~/.ssh/deploy_key
+          rm -f ~/.ssh/config
           rm -f frontend.tar.gz backend.tar.gz
       
       - name: ✅ Deployment complete
