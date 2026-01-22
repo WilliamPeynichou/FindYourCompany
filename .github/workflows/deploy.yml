@@ -23,7 +23,7 @@ jobs:
       - name: 📦 Install frontend dependencies
         run: |
           cd client
-          npm ci
+          npm install
       
       - name: 🏗️ Build frontend
         env:
