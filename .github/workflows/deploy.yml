@@ -42,33 +42,46 @@ jobs:
           cd ..
       
       - name: 🔑 Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          
+          # Écrire la clé privée
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          # Désactiver la vérification stricte des clés (plus simple)
-          cat >> ~/.ssh/config << EOF
-          Host *
+          
+          # Créer la config SSH
+          cat > ~/.ssh/config << EOF
+          Host deploy-server
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/deploy_key
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
             LogLevel ERROR
           EOF
           chmod 600 ~/.ssh/config
+          
+          # Debug : vérifier que la clé est bien écrite
+          echo "Key file size: $(wc -c < ~/.ssh/deploy_key) bytes"
+          echo "Key starts with: $(head -c 30 ~/.ssh/deploy_key)"
       
-      - name: 🔍 Debug - Test SSH connection
+      - name: 🔍 Test SSH connection
         run: |
-          echo "Testing SSH connection to ${{ secrets.SSH_HOST }}..."
-          ssh -i ~/.ssh/deploy_key -o ConnectTimeout=30 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH connection successful!'"
+          echo "Testing SSH connection..."
+          ssh deploy-server "echo 'SSH OK - Connected as $(whoami) on $(hostname)'"
       
       - name: 📤 Upload archives to server
         run: |
-          scp -i ~/.ssh/deploy_key frontend.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/
-          scp -i ~/.ssh/deploy_key backend.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/
+          scp frontend.tar.gz deploy-server:~/
+          scp backend.tar.gz deploy-server:~/
       
       - name: 🚀 Deploy on server
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
-            # Déployer le frontend
+          ssh deploy-server << 'ENDSSH'
             echo "📤 Déploiement du frontend..."
             mkdir -p ~/public_html/trouvetaboite.com
             cd ~/public_html/trouvetaboite.com
@@ -76,7 +89,6 @@ jobs:
             rm ~/frontend.tar.gz
             echo "✅ Frontend déployé"
             
-            # Déployer le backend
             echo "📤 Déploiement du backend..."
             mkdir -p ~/nodejs/trouvetaboite-api
             cd ~/nodejs/trouvetaboite-api
@@ -84,19 +96,15 @@ jobs:
             rm ~/backend.tar.gz
             echo "✅ Backend déployé"
             
-            echo ""
             echo "🎉 Déploiement terminé !"
           ENDSSH
       
       - name: 🧹 Cleanup
         if: always()
         run: |
-          rm -f ~/.ssh/deploy_key
-          rm -f ~/.ssh/config
+          rm -f ~/.ssh/deploy_key ~/.ssh/config
           rm -f frontend.tar.gz backend.tar.gz
       
       - name: ✅ Deployment complete
         run: |
           echo "🎉 Déploiement réussi sur trouvetaboite.com"
-          echo "📝 Vérifiez : https://trouvetaboite.com"
-          echo "📝 API Health : https://trouvetaboite.com/api/health"
