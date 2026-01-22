@@ -1,4 +1,4 @@
-name: Deploy to O2Switch
+name: Deploy to O2Switch via FTP
 
 on:
   push:
@@ -32,79 +32,35 @@ jobs:
           cd client
           npm run build
       
-      - name: 📦 Create deployment archives
-        run: |
-          cd client/dist
-          tar -czf ../../frontend.tar.gz .
-          cd ../..
-          cd server
-          tar -czf ../backend.tar.gz --exclude='node_modules' .
-          cd ..
+      - name: 📤 Deploy Frontend via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./client/dist/
+          server-dir: /public_html/trouvetaboite.com/
+          dangerous-clean-slate: false
       
-      - name: 🔑 Setup SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-        run: |
-          mkdir -p ~/.ssh
-          
-          # Écrire la clé privée
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          
-          # Créer la config SSH
-          cat > ~/.ssh/config << EOF
-          Host deploy-server
-            HostName $SSH_HOST
-            User $SSH_USER
-            IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
-            UserKnownHostsFile /dev/null
-            LogLevel ERROR
-          EOF
-          chmod 600 ~/.ssh/config
-          
-          # Debug : vérifier que la clé est bien écrite
-          echo "Key file size: $(wc -c < ~/.ssh/deploy_key) bytes"
-          echo "Key starts with: $(head -c 30 ~/.ssh/deploy_key)"
-      
-      - name: 🔍 Test SSH connection
-        run: |
-          echo "Testing SSH connection..."
-          ssh deploy-server "echo 'SSH OK - Connected as $(whoami) on $(hostname)'"
-      
-      - name: 📤 Upload archives to server
-        run: |
-          scp frontend.tar.gz deploy-server:~/
-          scp backend.tar.gz deploy-server:~/
-      
-      - name: 🚀 Deploy on server
-        run: |
-          ssh deploy-server << 'ENDSSH'
-            echo "📤 Déploiement du frontend..."
-            mkdir -p ~/public_html/trouvetaboite.com
-            cd ~/public_html/trouvetaboite.com
-            tar -xzf ~/frontend.tar.gz
-            rm ~/frontend.tar.gz
-            echo "✅ Frontend déployé"
-            
-            echo "📤 Déploiement du backend..."
-            mkdir -p ~/nodejs/trouvetaboite-api
-            cd ~/nodejs/trouvetaboite-api
-            tar -xzf ~/backend.tar.gz
-            rm ~/backend.tar.gz
-            echo "✅ Backend déployé"
-            
-            echo "🎉 Déploiement terminé !"
-          ENDSSH
-      
-      - name: 🧹 Cleanup
-        if: always()
-        run: |
-          rm -f ~/.ssh/deploy_key ~/.ssh/config
-          rm -f frontend.tar.gz backend.tar.gz
+      - name: 📤 Deploy Backend via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./server/
+          server-dir: /nodejs/trouvetaboite-api/
+          dangerous-clean-slate: false
+          exclude: |
+            **/node_modules/**
+            **/.env
       
       - name: ✅ Deployment complete
         run: |
           echo "🎉 Déploiement réussi sur trouvetaboite.com"
+          echo "📝 Frontend : https://trouvetaboite.com"
+          echo "📝 API : https://trouvetaboite.com/api/health"
+          echo ""
+          echo "⚠️  N'oubliez pas dans cPanel :"
+          echo "   - Run NPM Install dans Node.js App"
+          echo "   - Restart l'application"
