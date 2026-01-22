@@ -1,127 +1,118 @@
-# 🚀 Guide de Déploiement - TrouveTaBoite
+# 🚀 Déploiement - TrouveTaBoite
 
 ## Prérequis
 
 - Compte O2Switch avec accès cPanel
 - Domaine `trouvetaboite.com` configuré
-- Node.js disponible sur le serveur
+- Accès au Terminal dans cPanel
 
 ---
 
-## 📦 Étape 1 : Build du Frontend
+## 📦 Premier déploiement
+
+### Étape 1 : Préparer les dossiers
+
+Ouvrez le **Terminal** dans cPanel et exécutez :
 
 ```bash
-cd client
+# Créer les dossiers
+mkdir -p ~/public_html/trouvetaboite.com
+mkdir -p ~/nodejs/trouvetaboite-api
+
+# Cloner le repo
+cd ~
+git clone https://github.com/WilliamPeynichou/FindYourCompany.git
+```
+
+### Étape 2 : Build et déployer le frontend
+
+```bash
+cd ~/FindYourCompany/client
 npm install
 npm run build
+
+# Copier le build vers le dossier du domaine
+cp -r dist/* ~/public_html/trouvetaboite.com/
+cp public/.htaccess ~/public_html/trouvetaboite.com/
 ```
 
-Le dossier `dist/` est créé avec les fichiers à uploader.
+### Étape 3 : Déployer le backend
 
----
+```bash
+# Copier les fichiers du serveur
+cp -r ~/FindYourCompany/server/* ~/nodejs/trouvetaboite-api/
+```
 
-## 📤 Étape 2 : Upload sur O2Switch
+### Étape 4 : Configurer Node.js dans cPanel
 
-### Frontend (fichiers statiques)
-
-1. Connectez-vous à **cPanel**
-2. Ouvrez le **Gestionnaire de fichiers**
-3. Naviguez vers `/public_html/` (ou le dossier de votre domaine)
-4. **Supprimez** les fichiers existants (sauf .htaccess si déjà configuré)
-5. **Uploadez** tout le contenu du dossier `client/dist/`
-6. **Uploadez** le fichier `client/public/.htaccess` à la racine
-
-### Backend (Node.js)
-
-1. Dans cPanel, cherchez **"Setup Node.js App"**
-2. Cliquez sur **"Create Application"**
+1. Allez dans **cPanel → Setup Node.js App**
+2. Cliquez **Create Application**
 3. Configurez :
-   - **Node.js version** : 18.x ou 20.x
-   - **Application mode** : Production
-   - **Application root** : `/home/VOTRE_USER/nodejs/trouvetaboite-api`
-   - **Application URL** : Laissez vide ou configurez un sous-domaine
-   - **Startup file** : `index.js`
-4. Cliquez sur **"Create"**
-5. Uploadez les fichiers du dossier `server/` (sauf `node_modules/`)
-6. Créez le fichier `.env` avec vos vraies valeurs (voir `env.example`)
-7. Dans le panneau Node.js, cliquez sur **"Run NPM Install"**
-8. Cliquez sur **"Restart"**
+   - **Node.js version** : `18.x` ou `20.x`
+   - **Application mode** : `Production`
+   - **Application root** : `/home/kifo1668/nodejs/trouvetaboite-api`
+   - **Application startup file** : `index.js`
+4. Cliquez **Create**
+
+### Étape 5 : Variables d'environnement
+
+Dans l'interface Node.js, ajoutez ces variables :
+
+| Variable | Valeur |
+|----------|--------|
+| `NODE_ENV` | `production` |
+| `PORT` | `5000` |
+| `ALLOWED_ORIGINS` | `https://trouvetaboite.com,https://www.trouvetaboite.com` |
+
+### Étape 6 : Installer et démarrer
+
+1. Cliquez **Run NPM Install**
+2. Cliquez **Restart**
+
+### Étape 7 : Activer SSL
+
+1. **cPanel → SSL/TLS** ou **Let's Encrypt**
+2. Activez le certificat pour `trouvetaboite.com`
 
 ---
 
-## 🔒 Étape 3 : SSL/HTTPS
+## 🔄 Mise à jour du site
 
-1. Dans cPanel → **SSL/TLS** ou **Let's Encrypt SSL**
-2. Sélectionnez votre domaine `trouvetaboite.com`
-3. Cliquez sur **"Issue"** ou **"Generate"**
-4. Ajoutez aussi `www.trouvetaboite.com`
+Pour mettre à jour après des modifications :
 
----
+```bash
+cd ~/FindYourCompany
+git pull
 
-## ⚙️ Étape 4 : Configuration .env
+# Rebuild frontend
+cd client
+npm run build
+cp -r dist/* ~/public_html/trouvetaboite.com/
 
-### Sur le serveur, créez `/home/USER/nodejs/trouvetaboite-api/.env` :
-
-```env
-NODE_ENV=production
-PORT=5000
-
-# APIs (si utilisées)
-PAPPERS_API_TOKEN=votre_vrai_token
-INSEE_API_KEY=votre_vraie_cle
-
-# CORS - Important !
-ALLOWED_ORIGINS=https://trouvetaboite.com,https://www.trouvetaboite.com
+# Mettre à jour backend
+cp -r ~/FindYourCompany/server/* ~/nodejs/trouvetaboite-api/
 ```
 
----
-
-## 🔄 Étape 5 : Configuration du Proxy
-
-Si le backend est sur un port différent, le `.htaccess` redirige `/api/*` vers le backend Node.js.
-
-**Alternative** : Créer un sous-domaine `api.trouvetaboite.com` pointant vers l'app Node.js.
+Puis dans cPanel → **Node.js App** → **Restart**
 
 ---
 
-## ✅ Checklist finale
+## ✅ Vérification
 
-- [ ] Frontend uploadé dans `/public_html/`
-- [ ] `.htaccess` en place
-- [ ] Backend Node.js configuré et démarré
-- [ ] Fichier `.env` créé avec les vraies valeurs
-- [ ] SSL activé pour le domaine
-- [ ] Test : `https://trouvetaboite.com` fonctionne
-- [ ] Test : `https://trouvetaboite.com/api/health` répond
+- **Frontend** : https://trouvetaboite.com
+- **API** : https://trouvetaboite.com/api/health
 
 ---
 
 ## 🐛 Dépannage
 
-### Le site affiche une page blanche
-- Vérifiez que `index.html` est bien à la racine
-- Vérifiez le `.htaccess`
+### Page blanche
+- Vérifiez que `.htaccess` est bien copié
+- Vérifiez que `index.html` existe dans `/public_html/trouvetaboite.com/`
 
-### Erreur 500
-- Vérifiez les logs dans cPanel → Error Logs
-- Vérifiez que le `.htaccess` est correct
-
-### L'API ne répond pas
-- Vérifiez que l'app Node.js est démarrée
-- Vérifiez les logs Node.js dans cPanel
-- Vérifiez le fichier `.env`
+### API ne répond pas
+- Vérifiez que l'app Node.js est **Running**
+- Consultez les logs dans l'interface Node.js
 
 ### Erreur CORS
-- Vérifiez `ALLOWED_ORIGINS` dans le `.env` du backend
-- Assurez-vous d'utiliser `https://` et pas `http://`
-
----
-
-## 🔄 Mise à jour
-
-Pour mettre à jour le site :
-
-1. `git pull` sur votre machine locale
-2. `npm run build` dans le dossier client
-3. Re-uploadez le contenu de `dist/`
-4. Si le backend a changé, re-uploadez et redémarrez l'app Node.js
+- Vérifiez la variable `ALLOWED_ORIGINS`
