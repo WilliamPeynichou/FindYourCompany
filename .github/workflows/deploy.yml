@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Permet de lancer manuellement le déploiement
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -32,49 +32,59 @@ jobs:
           cd client
           npm run build
       
-      - name: 📤 Deploy frontend to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "client/dist/*"
-          target: "/home/${{ secrets.SSH_USER }}/temp_deploy/"
-          strip_components: 2
+      - name: 📦 Create deployment archives
+        run: |
+          cd client/dist
+          tar -czf ../../frontend.tar.gz .
+          cd ../..
+          cd server
+          tar -czf ../backend.tar.gz --exclude='node_modules' .
+          cd ..
       
-      - name: 📤 Deploy backend to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "server/*"
-          target: "/home/${{ secrets.SSH_USER }}/temp_deploy_backend/"
-          strip_components: 1
-          rm: true
+      - name: 🔑 Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
       
-      - name: 🚀 Execute deployment commands
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
+      - name: 📤 Upload archives to server
+        run: |
+          scp -i ~/.ssh/deploy_key frontend.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/
+          scp -i ~/.ssh/deploy_key backend.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/
+      
+      - name: 🚀 Deploy on server
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
             # Déployer le frontend
-            mkdir -p /home/${{ secrets.SSH_USER }}/public_html/trouvetaboite.com
-            cp -r /home/${{ secrets.SSH_USER }}/temp_deploy/* /home/${{ secrets.SSH_USER }}/public_html/trouvetaboite.com/
-            rm -rf /home/${{ secrets.SSH_USER }}/temp_deploy
+            echo "📤 Déploiement du frontend..."
+            mkdir -p ~/public_html/trouvetaboite.com
+            cd ~/public_html/trouvetaboite.com
+            tar -xzf ~/frontend.tar.gz
+            rm ~/frontend.tar.gz
+            echo "✅ Frontend déployé"
             
             # Déployer le backend
-            mkdir -p /home/${{ secrets.SSH_USER }}/nodejs/trouvetaboite-api
-            cp -r /home/${{ secrets.SSH_USER }}/temp_deploy_backend/* /home/${{ secrets.SSH_USER }}/nodejs/trouvetaboite-api/
-            rm -rf /home/${{ secrets.SSH_USER }}/temp_deploy_backend
+            echo "📤 Déploiement du backend..."
+            mkdir -p ~/nodejs/trouvetaboite-api
+            cd ~/nodejs/trouvetaboite-api
+            tar -xzf ~/backend.tar.gz
+            rm ~/backend.tar.gz
+            echo "✅ Backend déployé"
             
-            echo "✅ Déploiement terminé !"
-            echo "🌐 Frontend: https://trouvetaboite.com"
-            echo "🔧 Backend: /home/${{ secrets.SSH_USER }}/nodejs/trouvetaboite-api"
             echo ""
-            echo "⚠️  N'oubliez pas de redémarrer l'app Node.js dans cPanel si le backend a changé !"
+            echo "🎉 Déploiement terminé !"
+            echo "🌐 Frontend: https://trouvetaboite.com"
+            echo "🔧 Backend: ~/nodejs/trouvetaboite-api"
+            echo ""
+            echo "⚠️  N'oubliez pas de redémarrer l'app Node.js dans cPanel !"
+          ENDSSH
+      
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          rm -f frontend.tar.gz backend.tar.gz
       
       - name: ✅ Deployment complete
         run: |
