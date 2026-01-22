@@ -1,0 +1,85 @@
+name: Deploy to O2Switch
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Permet de lancer manuellement le déploiement
+
+jobs:
+  deploy:
+    name: Build & Deploy to trouvetaboite.com
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+      
+      - name: 📦 Install frontend dependencies
+        run: |
+          cd client
+          npm ci
+      
+      - name: 🏗️ Build frontend
+        env:
+          VITE_API_URL: https://trouvetaboite.com
+        run: |
+          cd client
+          npm run build
+      
+      - name: 📤 Deploy frontend to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "client/dist/*"
+          target: "/home/${{ secrets.SSH_USER }}/temp_deploy/"
+          strip_components: 2
+      
+      - name: 📤 Deploy backend to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "server/*"
+          target: "/home/${{ secrets.SSH_USER }}/temp_deploy_backend/"
+          strip_components: 1
+          rm: true
+      
+      - name: 🚀 Execute deployment commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Déployer le frontend
+            mkdir -p /home/${{ secrets.SSH_USER }}/public_html/trouvetaboite.com
+            cp -r /home/${{ secrets.SSH_USER }}/temp_deploy/* /home/${{ secrets.SSH_USER }}/public_html/trouvetaboite.com/
+            rm -rf /home/${{ secrets.SSH_USER }}/temp_deploy
+            
+            # Déployer le backend
+            mkdir -p /home/${{ secrets.SSH_USER }}/nodejs/trouvetaboite-api
+            cp -r /home/${{ secrets.SSH_USER }}/temp_deploy_backend/* /home/${{ secrets.SSH_USER }}/nodejs/trouvetaboite-api/
+            rm -rf /home/${{ secrets.SSH_USER }}/temp_deploy_backend
+            
+            echo "✅ Déploiement terminé !"
+            echo "🌐 Frontend: https://trouvetaboite.com"
+            echo "🔧 Backend: /home/${{ secrets.SSH_USER }}/nodejs/trouvetaboite-api"
+            echo ""
+            echo "⚠️  N'oubliez pas de redémarrer l'app Node.js dans cPanel si le backend a changé !"
+      
+      - name: ✅ Deployment complete
+        run: |
+          echo "🎉 Déploiement réussi sur trouvetaboite.com"
+          echo "📝 Vérifiez : https://trouvetaboite.com"
+          echo "📝 API Health : https://trouvetaboite.com/api/health"
