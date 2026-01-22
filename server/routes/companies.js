@@ -1,11 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { Op } = require('sequelize');
 const sireneService = require('../services/sireneService');
 const pappersService = require('../services/pappersService');
 const rechercheEntreprisesService = require('../services/rechercheEntreprisesService');
-const { Company } = require('../models');
 const { validateSearchRequest, validateGetCompanies, handleValidationErrors } = require('../middleware/validation');
+
+// Import optionnel de la base de données (peut ne pas être configurée)
+let Company = null;
+try {
+  const models = require('../models');
+  Company = models.Company;
+} catch (error) {
+  console.log('⚠️  Base de données non configurée - La route GET /api/companies sera désactivée');
+}
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -351,6 +358,14 @@ router.post('/search-gouv', validateSearchRequest, handleValidationErrors, async
  * GET /api/companies?city=&sector=&limit=&page=
  */
 router.get('/', validateGetCompanies, handleValidationErrors, async (req, res) => {
+  // Vérifier si la base de données est disponible
+  if (!Company) {
+    return res.status(503).json({
+      error: 'Service indisponible',
+      message: 'La base de données n\'est pas configurée. Utilisez /api/companies/search-gouv pour rechercher des entreprises.'
+    });
+  }
+
   try {
     const { city, sector, limit = 50, page = 1 } = req.query;
     
