@@ -15,6 +15,19 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
       
+      - name: 🔍 Debug - Check secrets
+        run: |
+          echo "FTP_HOST length: ${#FTP_HOST}"
+          echo "FTP_USER length: ${#FTP_USER}"
+          echo "FTP_PASSWORD length: ${#FTP_PASSWORD}"
+          if [ -z "$FTP_HOST" ]; then echo "FTP_HOST is EMPTY!"; else echo "FTP_HOST is set"; fi
+          if [ -z "$FTP_USER" ]; then echo "FTP_USER is EMPTY!"; else echo "FTP_USER is set"; fi
+          if [ -z "$FTP_PASSWORD" ]; then echo "FTP_PASSWORD is EMPTY!"; else echo "FTP_PASSWORD is set"; fi
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -58,9 +71,3 @@ jobs:
       - name: ✅ Deployment complete
         run: |
           echo "🎉 Déploiement réussi sur trouvetaboite.com"
-          echo "📝 Frontend : https://trouvetaboite.com"
-          echo "📝 API : https://trouvetaboite.com/api/health"
-          echo ""
-          echo "⚠️  N'oubliez pas dans cPanel :"
-          echo "   - Run NPM Install dans Node.js App"
-          echo "   - Restart l'application"
