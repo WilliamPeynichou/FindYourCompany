@@ -1,0 +1,19 @@
+# .htaccess pour le backend Node.js sur o2switch (Phusion Passenger)
+# Ce fichier doit être placé dans le dossier public du sous-domaine API
+
+PassengerNodejs /home/USER/nodevenv/findyourcompany-api/18/bin/node
+PassengerAppType node
+PassengerStartupFile app.js
+PassengerAppRoot /home/USER/findyourcompany-api
+
+# Forcer HTTPS
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Headers de sécurité
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "DENY"
+  Header set X-XSS-Protection "1; mode=block"
+</IfModule>
