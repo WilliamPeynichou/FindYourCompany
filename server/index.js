@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -132,17 +133,8 @@ app.use((req, res, next) => {
 // ============================================================================
 // Routes publiques
 // ============================================================================
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'API TrouveTaBoite',
-    status: 'OK',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
-});
-
 app.get('/api/health', (req, res) => {
-  res.json({ 
+  res.json({
     status: 'OK',
     message: 'Backend opérationnel',
     timestamp: new Date().toISOString()
@@ -156,30 +148,43 @@ const companiesRoutes = require('./routes/companies');
 app.use('/api/companies', searchLimiter, companiesRoutes);
 
 // ============================================================================
+// Production : Servir le frontend React buildé depuis Express
+// ============================================================================
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+if (isProduction) {
+  app.use(express.static(clientDistPath));
+}
+
+// ============================================================================
 // SÉCURITÉ : Gestionnaire d'erreurs global
 // ============================================================================
 app.use((err, req, res, next) => {
   // Logger l'erreur de manière sécurisée
   console.error(`[ERROR] ${new Date().toISOString()} - ${err.message}`);
-  
+
   // Ne jamais exposer les stack traces en production
   const errorResponse = {
     error: 'Erreur serveur',
     message: isProduction ? 'Une erreur est survenue' : err.message
   };
-  
+
   // Ajouter le stack trace uniquement en développement
   if (!isProduction && err.stack) {
     errorResponse.stack = err.stack;
   }
-  
+
   res.status(err.status || 500).json(errorResponse);
 });
 
 // ============================================================================
-// SÉCURITÉ : Gestion des routes non trouvées
+// Gestion des routes non trouvées
+// En production : renvoyer index.html pour le routing React (SPA)
+// En développement : renvoyer une erreur JSON
 // ============================================================================
 app.use((req, res) => {
+  if (isProduction && !req.path.startsWith('/api/')) {
+    return res.sendFile(path.join(clientDistPath, 'index.html'));
+  }
   res.status(404).json({
     error: 'Route non trouvée',
     message: `La route ${req.method} ${req.path} n'existe pas`

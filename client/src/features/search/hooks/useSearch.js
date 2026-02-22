@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-// Utiliser le proxy Vite en développement, ou l'URL complète en production
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'http://localhost:3000');
+// Utiliser VITE_API_URL si défini, sinon URL relative (fonctionne avec le proxy Vite en dev et avec Express en prod)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 /**
  * Hook pour gérer la logique de recherche
