@@ -59,28 +59,34 @@ const validateSearchRequest = [
     }),
   
   body('location.lat')
-    .exists()
-    .withMessage('La latitude est requise')
+    .optional({ nullable: true, checkFalsy: true })
     .custom((value) => {
+      if (value === undefined || value === null || value === '') return true;
       const num = parseFloat(value);
       if (isNaN(num) || num < -90 || num > 90) {
         throw new Error('La latitude doit être un nombre entre -90 et 90');
       }
       return true;
     })
-    .customSanitizer(value => sanitizeCoordinate(value, -90, 90)),
-  
+    .customSanitizer(value => {
+      if (value === undefined || value === null || value === '') return null;
+      return sanitizeCoordinate(value, -90, 90);
+    }),
+
   body('location.lon')
-    .exists()
-    .withMessage('La longitude est requise')
+    .optional({ nullable: true, checkFalsy: true })
     .custom((value) => {
+      if (value === undefined || value === null || value === '') return true;
       const num = parseFloat(value);
       if (isNaN(num) || num < -180 || num > 180) {
         throw new Error('La longitude doit être un nombre entre -180 et 180');
       }
       return true;
     })
-    .customSanitizer(value => sanitizeCoordinate(value, -180, 180)),
+    .customSanitizer(value => {
+      if (value === undefined || value === null || value === '') return null;
+      return sanitizeCoordinate(value, -180, 180);
+    }),
   
   body('location.city')
     .optional()

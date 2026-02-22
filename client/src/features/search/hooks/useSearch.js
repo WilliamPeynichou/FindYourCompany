@@ -34,12 +34,14 @@ export const useSearch = () => {
       }
 
       // Préparer les données pour l'API
+      const lat = parseFloat(formData.location.lat);
+      const lon = parseFloat(formData.location.lon);
       const requestData = {
         location: {
           city: formData.location.city || '',
           postcode: formData.location.postcode || '',
-          lat: formData.location.lat || '',
-          lon: formData.location.lon || '',
+          ...(isFinite(lat) ? { lat } : {}),
+          ...(isFinite(lon) ? { lon } : {}),
           label: formData.location.label || ''
         },
         radius: formData.radius || 5,
