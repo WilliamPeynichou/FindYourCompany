@@ -73,14 +73,15 @@ const allowedOrigins = isProduction
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Autoriser les requêtes sans origin (ex: Postman, curl) uniquement en dev
-    if (!origin && !isProduction) {
+    // Autoriser les requêtes sans Origin (same-origin, proxy Apache/Passenger, curl)
+    // Sur O2Switch, les requêtes passent par Passenger/Apache et peuvent ne pas avoir d'Origin
+    if (!origin) {
       return callback(null, true);
     }
-    if (!origin && isProduction) {
-      return callback(new Error('Origin non autorisée'), false);
-    }
     if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    if (!isProduction) {
       return callback(null, true);
     }
     return callback(new Error('Origin non autorisée par CORS'), false);
@@ -149,10 +150,24 @@ app.use('/api/companies', searchLimiter, companiesRoutes);
 
 // ============================================================================
 // Production : Servir le frontend React buildé depuis Express
+// Sur O2Switch : CLIENT_DIST_PATH=/home/kifo1668/public_html/trouvetaboite.com
+// En local : utilise ../client/dist par défaut
 // ============================================================================
-const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+const clientDistPath = process.env.CLIENT_DIST_PATH || path.join(__dirname, '..', 'client', 'dist');
 if (isProduction) {
-  app.use(express.static(clientDistPath));
+  const fs = require('fs');
+  if (fs.existsSync(clientDistPath)) {
+    console.log(`📁 Serving static files from: ${clientDistPath}`);
+    app.use(express.static(clientDistPath, {
+      maxAge: '1y',
+      immutable: true,
+      index: false // On gère index.html via le catch-all route
+    }));
+  } else {
+    console.warn(`⚠️  CLIENT_DIST_PATH not found: ${clientDistPath}`);
+    console.warn('   Le frontend ne sera pas servi par Express.');
+    console.warn('   Définissez CLIENT_DIST_PATH ou placez le build dans ../client/dist');
+  }
 }
 
 // ============================================================================
@@ -206,10 +221,14 @@ const checkConfiguration = () => {
   if (isProduction && !process.env.ALLOWED_ORIGINS) {
     warnings.push('ALLOWED_ORIGINS non défini en production');
   }
-  
+  if (isProduction && !process.env.CLIENT_DIST_PATH) {
+    warnings.push('CLIENT_DIST_PATH non défini - Express ne servira pas le frontend');
+  }
+
   console.log('\n📋 Configuration:');
   console.log(`   Mode: ${isProduction ? 'PRODUCTION' : 'DÉVELOPPEMENT'}`);
   console.log(`   Port: ${PORT}`);
+  console.log(`   CLIENT_DIST_PATH: ${clientDistPath}`);
   console.log(`   PAPPERS_API_TOKEN: ${process.env.PAPPERS_API_TOKEN ? '✅' : '⚠️'}`);
   console.log(`   INSEE_API_KEY: ${process.env.INSEE_API_KEY ? '✅' : '⚠️'}`);
   

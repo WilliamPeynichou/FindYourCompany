@@ -1,4 +1,5 @@
 const axios = require('axios');
+const https = require('https');
 
 /**
  * Service pour interagir avec l'API Recherche Entreprises (data.gouv.fr)
@@ -8,6 +9,21 @@ const axios = require('axios');
 class RechercheEntreprisesService {
   constructor() {
     this.baseURL = 'https://recherche-entreprises.api.gouv.fr';
+    // Agent HTTPS compatible avec les hébergements mutualisés (O2Switch, etc.)
+    // Certains serveurs ont des certificats CA obsolètes
+    this.httpsAgent = new https.Agent({
+      rejectUnauthorized: true,
+      minVersion: 'TLSv1.2'
+    });
+    // Client axios précconfiguré avec l'agent HTTPS
+    this.client = axios.create({
+      httpsAgent: this.httpsAgent,
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'TrouveTaBoite/1.0',
+        'Accept': 'application/json'
+      }
+    });
   }
 
   /**
@@ -70,7 +86,7 @@ class RechercheEntreprisesService {
    */
   async geocodePostcode(postcode) {
     try {
-      const response = await axios.get('https://api-adresse.data.gouv.fr/search/', {
+      const response = await this.client.get('https://api-adresse.data.gouv.fr/search/', {
         params: {
           q: postcode,
           type: 'municipality',
@@ -103,7 +119,7 @@ class RechercheEntreprisesService {
     try {
       // L'API Geo ne supporte pas la recherche par rayon directement
       // On récupère les communes environnantes via une requête géographique
-      const response = await axios.get('https://geo.api.gouv.fr/communes', {
+      const response = await this.client.get('https://geo.api.gouv.fr/communes', {
         params: {
           lat: centerLat,
           lon: centerLon,
@@ -186,9 +202,8 @@ class RechercheEntreprisesService {
 
             console.log(`   🔎 Code NAF: ${nafCode}`);
 
-            const response = await axios.get(`${this.baseURL}/search`, {
-              params,
-              timeout: 15000
+            const response = await this.client.get(`${this.baseURL}/search`, {
+              params
             });
 
             if (response.data.results) {
@@ -219,9 +234,8 @@ class RechercheEntreprisesService {
           q: city || '*'
         };
 
-        const response = await axios.get(`${this.baseURL}/search`, {
-          params,
-          timeout: 15000
+        const response = await this.client.get(`${this.baseURL}/search`, {
+          params
         });
 
         allResults = response.data.results || [];
