@@ -310,12 +310,44 @@ class RechercheEntreprisesService {
       lat: lat,
       lon: lon,
       dateCreation: ent.date_creation || siege.date_creation || null,
-      formeJuridique: ent.nature_juridique || '',
+      formeJuridique: this.getNatureJuridiqueLabel(ent.nature_juridique) || ent.nature_juridique || '',
       effectif: siege.tranche_effectif_salarie || '',
       etatAdministratif: ent.etat_administratif || 'A',
       dirigeants: dirigeants,
       source: 'recherche-entreprises.api.gouv.fr'
     };
+  }
+
+  /**
+   * Convertit un code catégorie juridique INSEE en libellé humain
+   */
+  getNatureJuridiqueLabel(code) {
+    if (!code) return null;
+    const labels = {
+      '1000': 'Entrepreneur individuel',
+      '1100': 'Artisan-Commerçant',
+      '1200': 'Commerçant',
+      '1300': 'Artisan',
+      '2110': 'Indivision',
+      '2120': 'Société créée de fait',
+      '5410': 'SARL (Société à responsabilité limitée)',
+      '5420': 'EURL (SARL unipersonnelle)',
+      '5498': 'SASU (SAS unipersonnelle)',
+      '5499': 'SAS (Société par actions simplifiée)',
+      '5560': 'Société coopérative de production (SCOP)',
+      '5710': 'SA (Société anonyme)',
+      '5720': 'SA à directoire',
+      '5800': 'Société européenne',
+      '6540': 'Société civile',
+      '6316': 'Syndicat de copropriété',
+      '9110': 'Syndicat de salariés',
+      '9210': 'Association non déclarée',
+      '9220': 'Association déclarée',
+      '9230': 'Association reconnue d\'utilité publique',
+      '9260': 'Fondation',
+      '9270': 'Congrégation',
+    };
+    return labels[String(code)] || null;
   }
 
   /**
