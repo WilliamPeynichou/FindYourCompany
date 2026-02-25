@@ -3,7 +3,7 @@ const router = express.Router();
 const sireneService = require('../services/sireneService');
 const pappersService = require('../services/pappersService');
 const rechercheEntreprisesService = require('../services/rechercheEntreprisesService');
-const { validateSearchRequest, validateGetCompanies, handleValidationErrors } = require('../middleware/validation');
+const { validateSearchRequest, validateAssociationSearch, validateGetCompanies, handleValidationErrors } = require('../middleware/validation');
 
 // Import optionnel de la base de données (peut ne pas être configurée)
 let Company = null;
@@ -350,6 +350,73 @@ router.post('/search-gouv', validateSearchRequest, handleValidationErrors, async
   } catch (error) {
     console.error('[ERROR] Recherche API Gouv:', error.message);
     res.status(500).json(formatError(error, 'Erreur lors de la recherche'));
+  }
+});
+
+/**
+ * Route de recherche d'associations via l'API Recherche Entreprises
+ * POST /api/companies/search-associations
+ * Body: { location: { city, postcode, lat, lon, label }, radius, domain }
+ */
+router.post('/search-associations', validateAssociationSearch, handleValidationErrors, async (req, res) => {
+  secureLog('Requête recherche associations reçue');
+
+  try {
+    const { location, radius, domain } = req.body;
+
+    if (!location || (!location.city && !location.postcode)) {
+      return res.status(400).json({
+        error: 'Localisation requise',
+        message: 'Ville ou code postal requis pour la recherche'
+      });
+    }
+
+    let centerLat = parseFloat(location.lat);
+    let centerLon = parseFloat(location.lon);
+
+    if ((!centerLat || !centerLon) && location.postcode) {
+      try {
+        const geoData = await rechercheEntreprisesService.geocodePostcode(location.postcode);
+        centerLat = geoData.lat;
+        centerLon = geoData.lon;
+      } catch (geoError) {
+        secureLog('Géocodage échoué, recherche sans filtre de distance');
+      }
+    }
+
+    const results = await rechercheEntreprisesService.searchAssociations({
+      city: location.city,
+      postcode: location.postcode,
+      domain: domain || '',
+      radius: radius || 10,
+      centerLat: centerLat,
+      centerLon: centerLon
+    });
+
+    secureLog(`${results.length} associations trouvées`);
+
+    const stats = {
+      total: results.length,
+      withCoordinates: results.filter(c => c.lat && c.lon).length,
+      active: results.filter(c => c.etatAdministratif === 'A').length,
+      withDirigeants: results.filter(c => c.dirigeants && c.dirigeants.length > 0).length
+    };
+
+    const sanitized = sanitizeCompanyResults(results);
+
+    res.json({
+      companies: sanitized,
+      total: sanitized.length,
+      stats: stats,
+      source: 'Registre national des associations (data.gouv.fr)',
+      message: sanitized.length > 0
+        ? `${sanitized.length} associations trouvées`
+        : 'Aucune association trouvée dans cette zone'
+    });
+
+  } catch (error) {
+    console.error('[ERROR] Recherche associations:', error.message);
+    res.status(500).json(formatError(error, 'Erreur lors de la recherche d\'associations'));
   }
 });
 

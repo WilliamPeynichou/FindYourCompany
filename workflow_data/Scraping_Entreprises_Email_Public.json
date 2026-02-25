@@ -1,0 +1,241 @@
+{
+  "name": "Scraping Entreprises Email Public",
+  "id": "wmS8INwiB8FVhms0",
+  "nodes": [
+    {
+      "id": "d50032aa-e761-48f1-91b5-dfe4ddb1f7f2",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "search-companies",
+        "responseMode": "responseNode"
+      },
+      "name": "Webhook Trigger"
+    },
+    {
+      "id": "ad2583d4-4d91-4469-aacb-72efa4b266a3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        250,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.insee.fr/api-sirene/3.11/siret",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ 'codePostalEtablissement:' + $json.body.codePostal }}"
+            },
+            {
+              "name": "nombre",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-INSEE-Api-Key-Integration",
+              "value": "={{ $env.INSEE_API_KEY }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "API Sirene - Recherche"
+    },
+    {
+      "id": "0e47f2a8-95af-49e9-a2c0-64ade7c1ed35",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Extraire les établissements de la réponse Sirene\nconst etablissements = $input.first().json.etablissements || [];\n\nreturn etablissements.map(etab => {\n  const uniteLegale = etab.uniteLegale || {};\n  const adresse = etab.adresseEtablissement || {};\n  \n  // Nettoyer les valeurs [ND]\n  const cleanValue = (value) => {\n    if (!value || value === '[ND]' || value === 'ND') return null;\n    return value;\n  };\n  \n  // Construire le nom\n  let name = cleanValue(uniteLegale.denominationUniteLegale);\n  if (!name) {\n    const prenom = cleanValue(uniteLegale.prenom1UniteLegale);\n    const nom = cleanValue(uniteLegale.nomUniteLegale);\n    name = prenom && nom ? `${prenom} ${nom}` : (prenom || nom || 'Entreprise');\n  }\n  \n  // Construire l'adresse\n  const addressParts = [\n    cleanValue(adresse.numeroVoieEtablissement),\n    cleanValue(adresse.typeVoieEtablissement),\n    cleanValue(adresse.libelleVoieEtablissement),\n    cleanValue(adresse.codePostalEtablissement),\n    cleanValue(adresse.libelleCommuneEtablissement)\n  ].filter(Boolean);\n  \n  return {\n    json: {\n      siret: etab.siret,\n      siren: etab.siren,\n      name: name,\n      address: addressParts.join(' '),\n      city: cleanValue(adresse.libelleCommuneEtablissement) || '',\n      postcode: cleanValue(adresse.codePostalEtablissement) || '',\n      sector: cleanValue(uniteLegale.activitePrincipaleUniteLegale) || '',\n      email: null\n    }\n  };\n});"
+      },
+      "name": "Transformer Données Sirene"
+    },
+    {
+      "id": "30b3a414-3a84-47af-84e3-9f01794fbb7a",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        750,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.pappers.fr/v2/entreprise",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_token",
+              "value": "={{ $env.PAPPERS_API_KEY }}"
+            },
+            {
+              "name": "siren",
+              "value": "={{ $json.siren }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 10,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "name": "Pappers - Recherche Email"
+    },
+    {
+      "id": "2a585aff-54e7-428b-83fa-c36a04691772",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Récupérer les données de Pappers (chaque item est une réponse Pappers)\nconst items = $input.all();\nconst results = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const pappersData = items[i].json;\n  \n  // Extraire l'email depuis Pappers (peut être dans différents champs)\n  let email = null;\n  let phone = null;\n  let website = null;\n  \n  // Chercher l'email dans les différents champs possibles\n  if (pappersData.email) {\n    email = pappersData.email;\n  } else if (pappersData.siege && pappersData.siege.email) {\n    email = pappersData.siege.email;\n  } else if (pappersData.etablissement_siege && pappersData.etablissement_siege.email) {\n    email = pappersData.etablissement_siege.email;\n  }\n  \n  // Chercher le téléphone\n  if (pappersData.telephone) {\n    phone = pappersData.telephone;\n  } else if (pappersData.siege && pappersData.siege.telephone) {\n    phone = pappersData.siege.telephone;\n  }\n  \n  // Chercher le site web\n  if (pappersData.site_web) {\n    website = pappersData.site_web;\n  } else if (pappersData.siege && pappersData.siege.site_web) {\n    website = pappersData.siege.site_web;\n  }\n  \n  // Construire le nom de l'entreprise\n  let name = pappersData.nom_entreprise || pappersData.denomination || 'Entreprise';\n  \n  // Construire l'adresse\n  let address = '';\n  if (pappersData.siege) {\n    const s = pappersData.siege;\n    address = [s.adresse_ligne_1, s.code_postal, s.ville].filter(Boolean).join(' ');\n  }\n  \n  results.push({\n    json: {\n      siret: pappersData.siege?.siret || pappersData.siret || '',\n      siren: pappersData.siren || '',\n      name: name,\n      address: address,\n      city: pappersData.siege?.ville || '',\n      postcode: pappersData.siege?.code_postal || '',\n      sector: pappersData.code_naf || pappersData.libelle_code_naf || '',\n      email: email,\n      phone: phone,\n      website: website\n    }\n  });\n}\n\nreturn results;"
+      },
+      "name": "Extraire Email Pappers"
+    },
+    {
+      "id": "22cbacbe-7200-4bc5-801b-fc87c184e683",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.email }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Filtrer Avec Email"
+    },
+    {
+      "id": "46dd7ed4-af7f-4f26-954b-f972a65381d0",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        0
+      ],
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "name": "Reponse Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "API Sirene - Recherche",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Sirene - Recherche": {
+      "main": [
+        [
+          {
+            "node": "Transformer Données Sirene",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pappers - Recherche Email": {
+      "main": [
+        [
+          {
+            "node": "Extraire Email Pappers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrer Avec Email": {
+      "main": [
+        [
+          {
+            "node": "Reponse Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transformer Données Sirene": {
+      "main": [
+        [
+          {
+            "node": "Pappers - Recherche Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire Email Pappers": {
+      "main": [
+        [
+          {
+            "node": "Filtrer Avec Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c73974e8-b754-4f5f-84e3-ab5a1179aa6b",
+  "meta": {
+    "instanceId": "fdb5ddefccc75298fd151b0aaa556d2f0183ee369e3299d7040b8882efb94934"
+  },
+  "tags": []
+}
