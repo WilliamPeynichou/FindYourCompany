@@ -410,6 +410,142 @@ class RechercheEntreprisesService {
   }
 
   /**
+   * Codes NAF par domaine d'association
+   */
+  getDomainNafCodes(domainId) {
+    const DOMAIN_NAF = {
+      sport:     ['93.11Z', '93.12Z', '93.13Z', '93.19Z', '93.29Z'],
+      culture:   ['90.01Z', '90.02Z', '90.03A', '90.03B', '91.01Z', '91.02Z', '91.03Z'],
+      social:    ['88.10A', '88.10B', '88.10C', '88.91A', '88.91B', '88.99A', '88.99B'],
+      sante:     ['86.10Z', '86.21Z', '86.90A', '86.90B', '86.90C', '86.90D'],
+      education: ['85.51Z', '85.52Z', '85.59A', '85.59B', '85.60Z'],
+      loisirs:   ['93.29Z', '93.21Z', '96.09Z'],
+    };
+    return DOMAIN_NAF[domainId] || null;
+  }
+
+  /**
+   * Recherche des associations via l'API Recherche Entreprises
+   * @param {Object} params
+   * @param {string} params.city
+   * @param {string} params.postcode
+   * @param {string} params.domain - ID du domaine (sport, culture…) ou '' pour tous
+   * @param {number} params.radius
+   * @param {number} params.centerLat
+   * @param {number} params.centerLon
+   */
+  async searchAssociations({ city, postcode, domain = '', radius = 10, centerLat, centerLon }) {
+    try {
+      console.log('🔍 Recherche associations...', { city, postcode, domain, radius });
+
+      const ASSOCIATION_NJ_CODES = ['9110', '9210', '9220', '9230', '9260', '9270'];
+
+      const baseParams = {
+        page: 1,
+        per_page: 25,
+        etat_administratif: 'A'
+      };
+
+      if (postcode) {
+        baseParams.code_postal = postcode;
+      }
+
+      let allResults = [];
+
+      if (domain) {
+        // Recherche par codes NAF du domaine, puis filtre côté client sur forme juridique association
+        const nafCodes = this.getDomainNafCodes(domain);
+        if (nafCodes && nafCodes.length > 0) {
+          console.log(`📊 Recherche asso avec ${nafCodes.length} codes NAF pour le domaine "${domain}"`);
+
+          for (const nafCode of nafCodes) {
+            try {
+              const params = { ...baseParams, activite_principale: nafCode };
+              console.log(`   🔎 Code NAF: ${nafCode}`);
+
+              const response = await axios.get(`${this.baseURL}/search`, {
+                params,
+                timeout: 15000
+              });
+
+              if (response.data.results) {
+                allResults.push(...response.data.results);
+              }
+
+              await this.delay(100);
+            } catch (err) {
+              console.warn(`   ⚠️ Erreur pour code NAF ${nafCode}:`, err.message);
+            }
+          }
+
+          // Dédupliquer par SIREN
+          allResults = Array.from(new Map(allResults.map(item => [item.siren, item])).values());
+
+          // Filtrer côté client pour ne garder que les associations
+          allResults = allResults.filter(ent => {
+            const nj = String(ent.nature_juridique || '');
+            return ASSOCIATION_NJ_CODES.some(code => nj.startsWith(code.slice(0, 2)));
+          });
+        }
+      } else {
+        // Sans domaine : requête par code nature_juridique association
+        console.log('📊 Recherche toutes associations (par nature_juridique)');
+
+        for (const njCode of ASSOCIATION_NJ_CODES) {
+          try {
+            const params = { ...baseParams, nature_juridique: njCode };
+            console.log(`   🔎 Nature juridique: ${njCode}`);
+
+            const response = await axios.get(`${this.baseURL}/search`, {
+              params,
+              timeout: 15000
+            });
+
+            if (response.data.results) {
+              allResults.push(...response.data.results);
+            }
+
+            await this.delay(100);
+          } catch (err) {
+            console.warn(`   ⚠️ Erreur pour nature_juridique ${njCode}:`, err.message);
+          }
+        }
+
+        // Dédupliquer par SIREN
+        allResults = Array.from(new Map(allResults.map(item => [item.siren, item])).values());
+      }
+
+      console.log(`📊 Total: ${allResults.length} associations uniques trouvées`);
+
+      // Transformer les résultats
+      const companies = allResults.map(ent => this.transformData(ent));
+
+      // Filtrer par rayon
+      let filteredCompanies = companies;
+      if (centerLat && centerLon && radius) {
+        filteredCompanies = companies.filter(company => {
+          if (company.lat && company.lon) {
+            const distance = this.calculateDistance(centerLat, centerLon, company.lat, company.lon);
+            company.distance = Math.round(distance * 10) / 10;
+            return distance <= radius;
+          }
+          return company.postcode === postcode;
+        });
+
+        filteredCompanies.sort((a, b) => (a.distance || 999) - (b.distance || 999));
+      }
+
+      console.log(`✅ ${filteredCompanies.length} associations dans le rayon de ${radius}km`);
+
+      return filteredCompanies;
+
+    } catch (error) {
+      console.error('❌ Erreur recherche associations:', error.message);
+      throw new Error(`Erreur lors de la recherche d'associations: ${error.message}`);
+    }
+  }
+
+  /**
    * Délai pour éviter de surcharger l'API
    */
   delay(ms) {

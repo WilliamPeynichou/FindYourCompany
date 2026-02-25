@@ -234,11 +234,132 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+const VALID_DOMAINS = ['', 'sport', 'culture', 'social', 'sante', 'education', 'loisirs'];
+
+/**
+ * Middleware pour valider les données de recherche d'associations
+ */
+const validateAssociationSearch = [
+  // Reprendre les mêmes règles location/radius que validateSearchRequest
+  body('location')
+    .exists()
+    .withMessage('La localisation est requise')
+    .isObject()
+    .withMessage('La localisation doit être un objet')
+    .custom((value) => {
+      const allowedKeys = ['lat', 'lon', 'city', 'postcode', 'label', 'codeCommune', 'departement', 'codeDepartement'];
+      const keys = Object.keys(value || {});
+      const invalidKeys = keys.filter(k => !allowedKeys.includes(k));
+      if (invalidKeys.length > 0) {
+        throw new Error(`Propriétés non autorisées: ${invalidKeys.join(', ')}`);
+      }
+      return true;
+    }),
+
+  body('location.lat')
+    .exists()
+    .withMessage('La latitude est requise')
+    .custom((value) => {
+      const num = parseFloat(value);
+      if (isNaN(num) || num < -90 || num > 90) {
+        throw new Error('La latitude doit être un nombre entre -90 et 90');
+      }
+      return true;
+    })
+    .customSanitizer(value => sanitizeCoordinate(value, -90, 90)),
+
+  body('location.lon')
+    .exists()
+    .withMessage('La longitude est requise')
+    .custom((value) => {
+      const num = parseFloat(value);
+      if (isNaN(num) || num < -180 || num > 180) {
+        throw new Error('La longitude doit être un nombre entre -180 et 180');
+      }
+      return true;
+    })
+    .customSanitizer(value => sanitizeCoordinate(value, -180, 180)),
+
+  body('location.city')
+    .optional()
+    .isString()
+    .isLength({ max: 100 })
+    .matches(/^[a-zA-ZÀ-ÿ\s\-'\.]+$/)
+    .withMessage('Le nom de la ville contient des caractères invalides')
+    .customSanitizer(value => sanitizeString(value, 100)),
+
+  body('location.postcode')
+    .optional()
+    .isString()
+    .matches(/^[0-9]{5}$/)
+    .withMessage('Le code postal doit contenir exactement 5 chiffres')
+    .customSanitizer(value => {
+      if (!value) return null;
+      const clean = String(value).replace(/[^0-9]/g, '');
+      return clean.length === 5 ? clean : null;
+    }),
+
+  body('location.label')
+    .optional()
+    .isString()
+    .isLength({ max: 200 })
+    .customSanitizer(value => sanitizeString(value, 200)),
+
+  body('location.codeCommune')
+    .optional()
+    .isString()
+    .matches(/^[0-9A-Za-z]{5}$/)
+    .customSanitizer(value => sanitizeString(value, 5)),
+
+  body('location.departement')
+    .optional()
+    .isString()
+    .isLength({ max: 50 })
+    .customSanitizer(value => sanitizeString(value, 50)),
+
+  body('location.codeDepartement')
+    .optional()
+    .isString()
+    .matches(/^[0-9]{2,3}$/)
+    .customSanitizer(value => sanitizeString(value, 3)),
+
+  body('radius')
+    .optional()
+    .custom((value) => {
+      const num = parseInt(value, 10);
+      if (isNaN(num) || num < 0 || num > 200) {
+        throw new Error('Le rayon doit être un nombre entre 0 et 200 km');
+      }
+      return true;
+    })
+    .customSanitizer(value => {
+      const num = parseInt(value, 10);
+      if (isNaN(num)) return 10;
+      return Math.max(0, Math.min(200, num));
+    }),
+
+  body('domain')
+    .optional()
+    .isString()
+    .withMessage('Le domaine doit être une chaîne de caractères')
+    .custom(v => {
+      if (v !== undefined && v !== null && !VALID_DOMAINS.includes(v)) {
+        throw new Error('Domaine invalide');
+      }
+      return true;
+    })
+    .customSanitizer(value => {
+      if (!value) return '';
+      return VALID_DOMAINS.includes(value) ? value : '';
+    }),
+];
+
 /**
  * Export des secteurs valides pour utilisation dans d'autres modules
  */
 module.exports = {
   validateSearchRequest,
+  validateAssociationSearch,
   validateGetCompanies,
   handleValidationErrors,
   VALID_SECTORS

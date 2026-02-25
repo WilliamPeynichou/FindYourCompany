@@ -22,23 +22,30 @@ export const LocationAutocomplete = ({ value, onSelect, error }) => {
 
   useEffect(() => {
     const fetchSuggestions = async (val) => {
-      if (val.length < 2) {
+      const isPostalCode = /^\d+$/.test(val);
+
+      // Pour un code postal : attendre 5 chiffres exacts
+      if (isPostalCode && val.length < 5) {
         setSuggestions([]);
         return;
       }
-      
+
+      // Pour un nom de ville : attendre 2 caractères minimum
+      if (!isPostalCode && val.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+
       setLoading(true);
       try {
-        // Utiliser l'API Geo gouv.fr pour les communes françaises
-        // Cette API retourne uniquement des communes avec codes postaux
-        const response = await axios.get('https://geo.api.gouv.fr/communes', {
-          params: {
-            nom: val,
-            fields: 'nom,code,codesPostaux,centre,departement,region,population',
-            boost: 'population', // Privilégier les grandes villes
-            limit: 15
-          }
-        });
+        const params = {
+          fields: 'nom,code,codesPostaux,centre,departement,region,population',
+          boost: 'population',
+          limit: 15,
+          ...(isPostalCode ? { codePostal: val } : { nom: val })
+        };
+
+        const response = await axios.get('https://geo.api.gouv.fr/communes', { params });
 
         // Transformer les résultats pour avoir une entrée par code postal
         const results = [];
@@ -85,6 +92,7 @@ export const LocationAutocomplete = ({ value, onSelect, error }) => {
       return () => clearTimeout(timeoutId);
     } else {
       setSuggestions([]);
+      setIsOpen(false);
     }
   }, [query]);
 
