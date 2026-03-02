@@ -67,6 +67,8 @@ const AssociationSearch = () => {
           source={source}
           emptyTitle="Aucune association trouvée dans cette zone."
           emptyHint="Essayez d'élargir le rayon ou de changer de domaine."
+          entitySingular="association trouvée"
+          entityPlural="associations trouvées"
         />
       </section>
     </div>
