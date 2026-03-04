@@ -170,45 +170,20 @@ class RechercheEntreprisesService {
 
       let allResults = [];
 
-      // Si on a des codes NAF, faire des recherches par code
+      // Si on a des codes NAF, une seule requête avec tous les codes joints par virgule
       if (nafCodes && nafCodes.length > 0) {
         console.log(`📊 Recherche avec ${nafCodes.length} codes NAF pour le secteur "${sector}"`);
-        
-        // Limiter à 5 codes NAF les plus pertinents pour éviter trop de requêtes
-        const codesToSearch = nafCodes.slice(0, 5);
-        
-        for (const nafCode of codesToSearch) {
-          try {
-            const params = {
-              ...baseParams,
-              activite_principale: nafCode
-            };
 
-            console.log(`   🔎 Code NAF: ${nafCode}`);
+        const response = await axios.get(`${this.baseURL}/search`, {
+          params: {
+            ...baseParams,
+            activite_principale: nafCodes.join(',')
+          },
+          timeout: 15000
+        });
 
-            const response = await axios.get(`${this.baseURL}/search`, {
-              params,
-              timeout: 15000
-            });
-
-            if (response.data.results) {
-              allResults.push(...response.data.results);
-            }
-
-            // Petit délai entre les requêtes
-            await this.delay(100);
-          } catch (err) {
-            console.warn(`   ⚠️ Erreur pour code NAF ${nafCode}:`, err.message);
-          }
-        }
-
-        // Dédupliquer par SIREN
-        const uniqueResults = Array.from(
-          new Map(allResults.map(item => [item.siren, item])).values()
-        );
-        allResults = uniqueResults;
-
-        console.log(`📊 Total: ${allResults.length} entreprises uniques trouvées`);
+        allResults = response.data.results || [];
+        console.log(`📊 Total: ${allResults.length} entreprises trouvées`);
 
       } else {
         // Recherche sans filtre de secteur
@@ -458,28 +433,12 @@ class RechercheEntreprisesService {
         if (nafCodes && nafCodes.length > 0) {
           console.log(`📊 Recherche asso avec ${nafCodes.length} codes NAF pour le domaine "${domain}"`);
 
-          for (const nafCode of nafCodes) {
-            try {
-              const params = { ...baseParams, activite_principale: nafCode };
-              console.log(`   🔎 Code NAF: ${nafCode}`);
+          const response = await axios.get(`${this.baseURL}/search`, {
+            params: { ...baseParams, activite_principale: nafCodes.join(',') },
+            timeout: 15000
+          });
 
-              const response = await axios.get(`${this.baseURL}/search`, {
-                params,
-                timeout: 15000
-              });
-
-              if (response.data.results) {
-                allResults.push(...response.data.results);
-              }
-
-              await this.delay(100);
-            } catch (err) {
-              console.warn(`   ⚠️ Erreur pour code NAF ${nafCode}:`, err.message);
-            }
-          }
-
-          // Dédupliquer par SIREN
-          allResults = Array.from(new Map(allResults.map(item => [item.siren, item])).values());
+          allResults = response.data.results || [];
 
           // Filtrer côté client pour ne garder que les associations
           allResults = allResults.filter(ent => {
@@ -488,31 +447,15 @@ class RechercheEntreprisesService {
           });
         }
       } else {
-        // Sans domaine : requête par code nature_juridique association
+        // Sans domaine : requête unique avec tous les codes nature_juridique
         console.log('📊 Recherche toutes associations (par nature_juridique)');
 
-        for (const njCode of ASSOCIATION_NJ_CODES) {
-          try {
-            const params = { ...baseParams, nature_juridique: njCode };
-            console.log(`   🔎 Nature juridique: ${njCode}`);
+        const response = await axios.get(`${this.baseURL}/search`, {
+          params: { ...baseParams, nature_juridique: ASSOCIATION_NJ_CODES.join(',') },
+          timeout: 15000
+        });
 
-            const response = await axios.get(`${this.baseURL}/search`, {
-              params,
-              timeout: 15000
-            });
-
-            if (response.data.results) {
-              allResults.push(...response.data.results);
-            }
-
-            await this.delay(100);
-          } catch (err) {
-            console.warn(`   ⚠️ Erreur pour nature_juridique ${njCode}:`, err.message);
-          }
-        }
-
-        // Dédupliquer par SIREN
-        allResults = Array.from(new Map(allResults.map(item => [item.siren, item])).values());
+        allResults = response.data.results || [];
       }
 
       console.log(`📊 Total: ${allResults.length} associations uniques trouvées`);
@@ -545,12 +488,6 @@ class RechercheEntreprisesService {
     }
   }
 
-  /**
-   * Délai pour éviter de surcharger l'API
-   */
-  delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 }
 
 module.exports = new RechercheEntreprisesService();
