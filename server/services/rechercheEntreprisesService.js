@@ -174,7 +174,7 @@ class RechercheEntreprisesService {
       if (nafCodes && nafCodes.length > 0) {
         console.log(`📊 Recherche avec ${nafCodes.length} codes NAF pour le secteur "${sector}"`);
 
-        const response = await axios.get(`${this.baseURL}/search`, {
+        const response = await this.fetchWithRetry(`${this.baseURL}/search`, {
           params: {
             ...baseParams,
             activite_principale: nafCodes.join(',')
@@ -188,13 +188,13 @@ class RechercheEntreprisesService {
       } else {
         // Recherche sans filtre de secteur
         console.log('📊 Recherche sans filtre de secteur');
-        
+
         const params = {
           ...baseParams,
           q: city || '*'
         };
 
-        const response = await axios.get(`${this.baseURL}/search`, {
+        const response = await this.fetchWithRetry(`${this.baseURL}/search`, {
           params,
           timeout: 15000
         });
@@ -433,7 +433,7 @@ class RechercheEntreprisesService {
         if (nafCodes && nafCodes.length > 0) {
           console.log(`📊 Recherche asso avec ${nafCodes.length} codes NAF pour le domaine "${domain}"`);
 
-          const response = await axios.get(`${this.baseURL}/search`, {
+          const response = await this.fetchWithRetry(`${this.baseURL}/search`, {
             params: { ...baseParams, activite_principale: nafCodes.join(',') },
             timeout: 15000
           });
@@ -450,7 +450,7 @@ class RechercheEntreprisesService {
         // Sans domaine : requête unique avec tous les codes nature_juridique
         console.log('📊 Recherche toutes associations (par nature_juridique)');
 
-        const response = await axios.get(`${this.baseURL}/search`, {
+        const response = await this.fetchWithRetry(`${this.baseURL}/search`, {
           params: { ...baseParams, nature_juridique: ASSOCIATION_NJ_CODES.join(',') },
           timeout: 15000
         });
@@ -488,6 +488,21 @@ class RechercheEntreprisesService {
     }
   }
 
+  async fetchWithRetry(url, config, retries = 3, delay = 1000) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        return await axios.get(url, config);
+      } catch (err) {
+        if (err.response?.status === 429 && attempt < retries) {
+          console.warn(`   ⚠️ 429 reçu, retry ${attempt}/${retries - 1} dans ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
+        } else {
+          throw err;
+        }
+      }
+    }
+  }
 }
 
 module.exports = new RechercheEntreprisesService();
