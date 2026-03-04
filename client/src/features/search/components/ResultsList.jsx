@@ -29,7 +29,7 @@ const getLegalFormBadgeClass = (forme) => {
   return 'bg-zinc-100 text-zinc-600 border border-zinc-200';
 };
 
-export const ResultsList = ({ results, loading, stats, source, emptyTitle, emptyHint }) => {
+export const ResultsList = ({ results, loading, stats, source, emptyTitle, emptyHint, entitySingular, entityPlural }) => {
   const [expandedCards, setExpandedCards] = useState({});
   const [selectedCategories, setSelectedCategories] = useState([]);
 
@@ -102,7 +102,9 @@ export const ResultsList = ({ results, loading, stats, source, emptyTitle, empty
         <div>
           <h2 className="text-xl font-bold text-zinc-900">
             {filteredResults.length}{selectedCategories.length > 0 ? ` / ${allResults.length}` : ''}{' '}
-            {filteredResults.length === 1 ? 'entreprise trouvée' : 'entreprises trouvées'}
+            {filteredResults.length === 1
+              ? (entitySingular || 'entreprise trouvée')
+              : (entityPlural || 'entreprises trouvées')}
           </h2>
           {source && (
             <p className="text-xs text-zinc-500 mt-1">
