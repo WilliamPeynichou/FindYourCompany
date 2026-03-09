@@ -153,93 +153,86 @@ class RechercheEntreprisesService {
     try {
       console.log('🔍 Recherche API Gouv...', { city, postcode, sector, radius });
 
-      // Récupérer les codes NAF pour le secteur
       const nafCodes = this.getSectorNafCodes(sector);
-      
-      // Construire les paramètres de base
+
+      // Géocoder si pas de coordonnées fournies
+      let lat = centerLat;
+      let lon = centerLon;
+      if (!lat || !lon) {
+        const geoData = await this.geocodePostcode(postcode || city);
+        lat = geoData.lat;
+        lon = geoData.lon;
+      }
+
+      // L'API /near_point accepte un rayon max de 50km
+      const apiRadius = Math.min(radius, 50);
+
       const baseParams = {
-        page: 1,
-        per_page: 25, // Maximum autorisé par l'API
-        etat_administratif: 'A' // Seulement les entreprises actives
+        lat,
+        long: lon,
+        radius: apiRadius,
+        per_page: 25,
+        limite_matching_etablissements: 1,
       };
 
-      // Ajouter le filtre par code postal
-      if (postcode) {
-        baseParams.code_postal = postcode;
-      }
-
-      let allResults = [];
-
-      // Si on a des codes NAF, une seule requête avec tous les codes joints par virgule
       if (nafCodes && nafCodes.length > 0) {
+        baseParams.activite_principale = nafCodes.join(',');
         console.log(`📊 Recherche avec ${nafCodes.length} codes NAF pour le secteur "${sector}"`);
-
-        const response = await this.fetchWithRetry(`${this.baseURL}/search`, {
-          params: {
-            ...baseParams,
-            activite_principale: nafCodes.join(',')
-          },
-          timeout: 15000
-        });
-
-        allResults = response.data.results || [];
-        console.log(`📊 Total: ${allResults.length} entreprises trouvées`);
-
-      } else {
-        // Recherche sans filtre de secteur
-        console.log('📊 Recherche sans filtre de secteur');
-
-        const params = {
-          ...baseParams,
-          q: city || '*'
-        };
-
-        const response = await this.fetchWithRetry(`${this.baseURL}/search`, {
-          params,
-          timeout: 15000
-        });
-
-        allResults = response.data.results || [];
-        console.log(`📊 ${allResults.length} entreprises trouvées`);
       }
 
-      // Transformer les résultats
-      const companies = allResults.map(ent => this.transformData(ent));
+      // Première page pour connaître le total
+      const firstResponse = await this.fetchWithRetry(`${this.baseURL}/near_point`, {
+        params: { ...baseParams, page: 1 },
+        timeout: 15000
+      });
 
-      // Filtrer par rayon si on a les coordonnées du centre
-      let filteredCompanies = companies;
-      if (centerLat && centerLon && radius) {
-        filteredCompanies = companies.filter(company => {
-          if (company.lat && company.lon) {
-            const distance = this.calculateDistance(
-              centerLat, centerLon,
-              company.lat, company.lon
-            );
-            company.distance = Math.round(distance * 10) / 10;
-            return distance <= radius;
-          }
-          // Si pas de coordonnées, on garde l'entreprise si même code postal
-          return company.postcode === postcode;
-        });
+      const totalResults = firstResponse.data.total_results || 0;
+      const totalPages = firstResponse.data.total_pages || 1;
+      console.log(`📊 Total disponible: ${totalResults} entreprises (${totalPages} pages)`);
 
-        // Trier par distance
-        filteredCompanies.sort((a, b) => (a.distance || 999) - (b.distance || 999));
+      // Récupérer jusqu'à 100 résultats (4 pages) en parallèle
+      const MAX_PAGES = 4;
+      const pagesToFetch = Math.min(totalPages, MAX_PAGES) - 1; // -1 car page 1 déjà récupérée
+
+      let allResults = [...(firstResponse.data.results || [])];
+
+      if (pagesToFetch > 0) {
+        const pageRequests = Array.from({ length: pagesToFetch }, (_, i) =>
+          this.fetchWithRetry(`${this.baseURL}/near_point`, {
+            params: { ...baseParams, page: i + 2 },
+            timeout: 15000
+          })
+        );
+        const responses = await Promise.all(pageRequests);
+        responses.forEach(r => allResults.push(...(r.data.results || [])));
       }
 
-      console.log(`✅ ${filteredCompanies.length} entreprises dans le rayon de ${radius}km`);
+      console.log(`📊 ${allResults.length} entreprises récupérées (sur ${totalResults} disponibles)`);
 
-      return filteredCompanies;
+      // Transformer et calculer la distance exacte
+      const companies = allResults.map(ent => {
+        const company = this.transformData(ent);
+        if (company.lat && company.lon) {
+          company.distance = Math.round(this.calculateDistance(lat, lon, company.lat, company.lon) * 10) / 10;
+        }
+        return company;
+      });
+
+      companies.sort((a, b) => (a.distance || 999) - (b.distance || 999));
+
+      console.log(`✅ ${companies.length} entreprises dans le rayon de ${apiRadius}km`);
+      return companies;
 
     } catch (error) {
       console.error('❌ Erreur API Recherche Entreprises:');
       console.error('   Status:', error.response?.status);
       console.error('   Data:', JSON.stringify(error.response?.data, null, 2));
       console.error('   Message:', error.message);
-      
+
       if (error.response?.status === 400) {
         throw new Error(`Requête invalide: ${error.response?.data?.erreur || error.message}`);
       }
-      
+
       throw new Error(`Erreur lors de la recherche: ${error.message}`);
     }
   }
@@ -249,19 +242,25 @@ class RechercheEntreprisesService {
    */
   transformData(ent) {
     const siege = ent.siege || {};
-    
-    // Extraire les coordonnées
-    let lat = null, lon = null;
-    if (siege.latitude && siege.longitude) {
-      lat = parseFloat(siege.latitude);
-      lon = parseFloat(siege.longitude);
-    } else if (siege.coordonnees) {
-      const coords = siege.coordonnees.split(',');
-      if (coords.length === 2) {
-        lat = parseFloat(coords[0]);
-        lon = parseFloat(coords[1]);
+
+    // Utiliser l'établissement local (matching_etablissements) en priorité pour l'adresse
+    // car near_point renvoie l'établissement local, pas forcément le siège
+    const localEtab = (ent.matching_etablissements || [])[0] || null;
+    const location = localEtab || siege;
+
+    // Extraire les coordonnées depuis l'établissement local ou le siège
+    const extractCoords = (src) => {
+      if (src.latitude && src.longitude) {
+        return { lat: parseFloat(src.latitude), lon: parseFloat(src.longitude) };
       }
-    }
+      if (src.coordonnees) {
+        const parts = src.coordonnees.split(',');
+        if (parts.length === 2) return { lat: parseFloat(parts[0]), lon: parseFloat(parts[1]) };
+      }
+      return { lat: null, lon: null };
+    };
+
+    const { lat, lon } = extractCoords(location) || extractCoords(siege);
 
     // Extraire les dirigeants
     const dirigeants = (ent.dirigeants || []).map(d => ({
@@ -272,21 +271,21 @@ class RechercheEntreprisesService {
 
     return {
       siren: ent.siren,
-      siret: siege.siret || ent.siren,
+      siret: location.siret || siege.siret || ent.siren,
       name: ent.nom_complet || ent.nom_raison_sociale || 'Entreprise sans nom',
-      address: siege.adresse || siege.geo_adresse || 'Adresse non disponible',
-      city: siege.libelle_commune || '',
-      postcode: siege.code_postal || '',
+      address: location.adresse || location.geo_adresse || siege.adresse || 'Adresse non disponible',
+      city: location.libelle_commune || siege.libelle_commune || '',
+      postcode: location.code_postal || siege.code_postal || '',
       sector: ent.activite_principale || '',
       sectorLabel: this.getNafLabel(ent.activite_principale) || '',
-      phone: null, // Non disponible dans cette API
-      email: null, // Non disponible dans cette API
-      website: null, // Non disponible dans cette API
-      lat: lat,
-      lon: lon,
+      phone: null,
+      email: null,
+      website: null,
+      lat,
+      lon,
       dateCreation: ent.date_creation || siege.date_creation || null,
       formeJuridique: this.getNatureJuridiqueLabel(ent.nature_juridique) || ent.nature_juridique || '',
-      effectif: siege.tranche_effectif_salarie || '',
+      effectif: location.tranche_effectif_salarie || siege.tranche_effectif_salarie || '',
       etatAdministratif: ent.etat_administratif || 'A',
       dirigeants: dirigeants,
       source: 'recherche-entreprises.api.gouv.fr'

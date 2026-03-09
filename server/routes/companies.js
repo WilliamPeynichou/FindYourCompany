@@ -300,27 +300,13 @@ router.post('/search-gouv', validateSearchRequest, handleValidationErrors, async
       });
     }
 
-    // Géocoder le code postal pour avoir les coordonnées centrales
-    let centerLat = parseFloat(location.lat);
-    let centerLon = parseFloat(location.lon);
-
-    if ((!centerLat || !centerLon) && location.postcode) {
-      try {
-        const geoData = await rechercheEntreprisesService.geocodePostcode(location.postcode);
-        centerLat = geoData.lat;
-        centerLon = geoData.lon;
-      } catch (geoError) {
-        secureLog('Géocodage échoué, recherche sans filtre de distance');
-      }
-    }
-
     const results = await rechercheEntreprisesService.searchCompanies({
       city: location.city,
       postcode: location.postcode,
       sector: sector,
       radius: radius || 5,
-      centerLat: centerLat,
-      centerLon: centerLon
+      centerLat: parseFloat(location.lat) || null,
+      centerLon: parseFloat(location.lon) || null,
     });
 
     secureLog(`${results.length} entreprises trouvées`);
