@@ -1,39 +1,26 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import axios from 'axios';
 
-// Utiliser VITE_API_URL si défini, sinon URL relative (fonctionne avec le proxy Vite en dev et avec Express en prod)
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-/**
- * Hook pour gérer la logique de recherche
- * Utilise l'API Recherche Entreprises (data.gouv.fr) - GRATUITE
- */
 export const useSearch = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
   const [source, setSource] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalResults, setTotalResults] = useState(0);
 
-  const performSearch = async (formData) => {
-    setLoading(true);
-    setError(null);
-    setResults([]);
-    setStats(null);
-    setSource(null);
-    
+  const lastFormData = useRef(null);
+  const nextStartPage = useRef(null);
+
+  const fetchCompanies = async (formData, startPage, append) => {
     try {
-      // Vérifier que les données requises sont présentes
-      if (!formData.location) {
-        throw new Error('Localisation incomplète. Veuillez sélectionner un lieu.');
-      }
+      if (!formData.location) throw new Error('Localisation incomplète. Veuillez sélectionner un lieu.');
+      if (!formData.location.postcode && !formData.location.city) throw new Error('Ville ou code postal requis pour la recherche.');
 
-      // Ville ou code postal requis
-      if (!formData.location.postcode && !formData.location.city) {
-        throw new Error('Ville ou code postal requis pour la recherche.');
-      }
-
-      // Préparer les données pour l'API
       const requestData = {
         location: {
           city: formData.location.city || '',
@@ -43,73 +30,68 @@ export const useSearch = () => {
           label: formData.location.label || ''
         },
         radius: formData.radius || 5,
-        sector: formData.sector || ''
+        sector: formData.sector || '',
+        startPage
       };
 
-      console.log('🔍 Envoi de la requête API Gouv:', requestData);
-
-      // Appel API vers le backend - utilise la route API Gouv (gratuite)
       const response = await axios.post(
         `${API_BASE_URL}/api/companies/search-gouv`,
         requestData,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          timeout: 60000 // 1 minute
-        }
+        { headers: { 'Content-Type': 'application/json' }, timeout: 60000 }
       );
 
-      console.log('✅ Réponse API Gouv reçue:', response.data);
-
       const companies = response.data.companies || [];
-      
-      console.log(`📊 ${companies.length} entreprises trouvées`);
-      
-      // Sauvegarder les statistiques
-      if (response.data.stats) {
-        setStats(response.data.stats);
-        console.log(`   - ${response.data.stats.total} total`);
-        console.log(`   - ${response.data.stats.withCoordinates} avec coordonnées`);
-        console.log(`   - ${response.data.stats.withDirigeants} avec dirigeants`);
+
+      if (response.data.stats && !append) setStats(response.data.stats);
+      if (response.data.source && !append) setSource(response.data.source);
+
+      if (append) {
+        setResults(prev => [...prev, ...companies]);
+      } else {
+        setResults(companies);
+        if (companies.length === 0) setError('Aucune entreprise trouvée dans cette zone.');
       }
 
-      // Sauvegarder la source
-      if (response.data.source) {
-        setSource(response.data.source);
-      }
-
-      setResults(companies);
-      setLoading(false);
-
-      // Afficher un message si aucun résultat
-      if (companies.length === 0) {
-        setError('Aucune entreprise trouvée dans cette zone.');
-      }
+      nextStartPage.current = response.data.nextStartPage || null;
+      setHasMore(!!response.data.nextStartPage);
+      setTotalResults(response.data.totalResults || 0);
 
     } catch (err) {
-      console.error('❌ Erreur recherche:', err);
-      
       let errorMessage = "Une erreur est survenue lors de la recherche.";
-      
       if (err.response) {
-        // Erreur HTTP
         errorMessage = err.response.data?.error || err.response.data?.message || `Erreur ${err.response.status}`;
-        console.error('Détails erreur:', err.response.data);
       } else if (err.request) {
-        // Pas de réponse du serveur
         errorMessage = "Impossible de contacter le serveur. Vérifiez que le backend est démarré.";
-        console.error('Pas de réponse du serveur');
       } else if (err.message) {
-        // Erreur de validation
         errorMessage = err.message;
       }
-      
       setError(errorMessage);
-      setLoading(false);
-      setResults([]);
+      if (!append) setResults([]);
     }
   };
 
-  return { results, loading, error, stats, source, performSearch };
+  const performSearch = async (formData) => {
+    setLoading(true);
+    setError(null);
+    setResults([]);
+    setStats(null);
+    setSource(null);
+    setHasMore(false);
+    setTotalResults(0);
+    lastFormData.current = formData;
+    nextStartPage.current = null;
+
+    await fetchCompanies(formData, 1, false);
+    setLoading(false);
+  };
+
+  const loadMore = async () => {
+    if (!lastFormData.current || !nextStartPage.current || loadingMore) return;
+    setLoadingMore(true);
+    setError(null);
+    await fetchCompanies(lastFormData.current, nextStartPage.current, true);
+    setLoadingMore(false);
+  };
+
+  return { results, loading, loadingMore, error, stats, source, hasMore, totalResults, performSearch, loadMore };
 };

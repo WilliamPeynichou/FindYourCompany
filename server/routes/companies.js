@@ -291,22 +291,23 @@ router.post('/search-gouv', validateSearchRequest, handleValidationErrors, async
   secureLog('Requête API Gouv reçue');
   
   try {
-    const { location, radius, sector } = req.body;
+    const { location, radius, sector, startPage = 1 } = req.body;
 
     if (!location || (!location.city && !location.postcode)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Localisation requise',
         message: 'Ville ou code postal requis pour la recherche'
       });
     }
 
-    const results = await rechercheEntreprisesService.searchCompanies({
+    const { companies: results, totalResults, nextStartPage } = await rechercheEntreprisesService.searchCompanies({
       city: location.city,
       postcode: location.postcode,
       sector: sector,
       radius: radius || 5,
       centerLat: parseFloat(location.lat) || null,
       centerLon: parseFloat(location.lon) || null,
+      startPage: Math.max(1, parseInt(startPage) || 1),
     });
 
     secureLog(`${results.length} entreprises trouvées`);
@@ -325,10 +326,12 @@ router.post('/search-gouv', validateSearchRequest, handleValidationErrors, async
     res.json({
       companies: sanitizedCompanies,
       total: sanitizedCompanies.length,
+      totalResults,
+      nextStartPage,
       stats: stats,
       source: 'API Recherche Entreprises (data.gouv.fr)',
       note: 'Cette API gratuite ne fournit pas les emails/téléphones.',
-      message: sanitizedCompanies.length > 0 
+      message: sanitizedCompanies.length > 0
         ? `${sanitizedCompanies.length} entreprises trouvées`
         : 'Aucune entreprise trouvée dans cette zone'
     });
@@ -370,13 +373,14 @@ router.post('/search-associations', validateAssociationSearch, handleValidationE
       }
     }
 
-    const results = await rechercheEntreprisesService.searchAssociations({
+    const { companies: results, totalResults, nextStartPage } = await rechercheEntreprisesService.searchAssociations({
       city: location.city,
       postcode: location.postcode,
       domain: domain || '',
       radius: radius || 10,
       centerLat: centerLat,
-      centerLon: centerLon
+      centerLon: centerLon,
+      startPage: Math.max(1, parseInt(req.body.startPage) || 1),
     });
 
     secureLog(`${results.length} associations trouvées`);
@@ -393,6 +397,8 @@ router.post('/search-associations', validateAssociationSearch, handleValidationE
     res.json({
       companies: sanitized,
       total: sanitized.length,
+      totalResults,
+      nextStartPage,
       stats: stats,
       source: 'Registre national des associations (data.gouv.fr)',
       message: sanitized.length > 0

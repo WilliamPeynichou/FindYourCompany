@@ -5,7 +5,7 @@ import { ResultsList } from '../../search/components/ResultsList';
 import { useAssociationSearch } from '../hooks/useAssociationSearch';
 
 const AssociationSearch = () => {
-  const { results, loading, error, stats, source, performSearch } = useAssociationSearch();
+  const { results, loading, loadingMore, error, stats, source, hasMore, totalResults, performSearch, loadMore } = useAssociationSearch();
 
   return (
     <div>
@@ -51,7 +51,9 @@ const AssociationSearch = () => {
         </div>
       </div>
 
-      <AssociationForm onSearch={performSearch} loading={loading} />
+      <div className="mb-6">
+        <AssociationForm onSearch={performSearch} loading={loading} />
+      </div>
 
       {error && (
         <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -59,7 +61,7 @@ const AssociationSearch = () => {
         </div>
       )}
 
-      <section className="mt-8">
+      <section className="mt-4">
         <ResultsList
           results={results || []}
           loading={loading}
@@ -69,6 +71,10 @@ const AssociationSearch = () => {
           emptyHint="Essayez d'élargir le rayon ou de changer de domaine."
           entitySingular="association trouvée"
           entityPlural="associations trouvées"
+          onLoadMore={loadMore}
+          loadingMore={loadingMore}
+          hasMore={hasMore}
+          totalResults={totalResults}
         />
       </section>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Mail, MapPin, Phone, Globe, Building2, Users, Calendar, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Mail, MapPin, Phone, Globe, Building2, Users, Calendar, ChevronDown, ChevronUp, ExternalLink, ChevronRight } from 'lucide-react';
 import { sanitizeUrl, sanitizeEmail, sanitizePhone } from '../../../utils/escapeHtml';
 import { LegalFormFilter, LEGAL_CATEGORIES } from './LegalFormFilter';
 
@@ -29,7 +29,7 @@ const getLegalFormBadgeClass = (forme) => {
   return 'bg-zinc-100 text-zinc-600 border border-zinc-200';
 };
 
-export const ResultsList = ({ results, loading, stats, source, emptyTitle, emptyHint, entitySingular, entityPlural }) => {
+export const ResultsList = ({ results, loading, stats, source, emptyTitle, emptyHint, entitySingular, entityPlural, onLoadMore, loadingMore, hasMore, totalResults }) => {
   const [expandedCards, setExpandedCards] = useState({});
   const [selectedCategories, setSelectedCategories] = useState([]);
 
@@ -105,6 +105,9 @@ export const ResultsList = ({ results, loading, stats, source, emptyTitle, empty
             {filteredResults.length === 1
               ? (entitySingular || 'entreprise trouvée')
               : (entityPlural || 'entreprises trouvées')}
+            {totalResults > allResults.length && (
+              <span className="text-sm font-normal text-zinc-400 ml-2">sur {totalResults} disponibles</span>
+            )}
           </h2>
           {source && (
             <p className="text-xs text-zinc-500 mt-1">
@@ -307,6 +310,32 @@ export const ResultsList = ({ results, loading, stats, source, emptyTitle, empty
           );
         })}
       </div>
+
+      {/* Bouton charger plus */}
+      {hasMore && onLoadMore && (
+        <div className="flex flex-col items-center gap-2 pt-2 pb-2">
+          <button
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white text-sm font-semibold rounded-xl hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {loadingMore ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Chargement…
+              </>
+            ) : (
+              <>
+                Charger plus d'entreprises
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+          {totalResults > allResults.length && (
+            <span className="text-xs text-zinc-400">{allResults.length} affichées sur {totalResults} disponibles</span>
+          )}
+        </div>
+      )}
 
       {/* Note sur les données */}
       <div className="text-center py-4 text-xs text-zinc-400">

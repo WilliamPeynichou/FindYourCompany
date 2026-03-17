@@ -7,7 +7,7 @@ import { AdBanner } from './components/AdSense';
 import AssociationSearch from './features/associations/components/AssociationSearch';
 
 function App() {
-  const { results, loading, error, stats, source, performSearch } = useSearch();
+  const { results, loading, loadingMore, error, stats, source, hasMore, totalResults, performSearch, loadMore } = useSearch();
   const [mode, setMode] = useState('entreprises');
 
   return (
@@ -102,7 +102,7 @@ function App() {
               </div>
             </div>
 
-            <div className="mb-12">
+            <div className="mb-6">
               <SearchForm onSearch={performSearch} loading={loading} />
             </div>
 
@@ -120,7 +120,16 @@ function App() {
 
             {/* Résultats */}
             <section>
-              <ResultsList results={results || []} loading={loading} stats={stats} source={source} />
+              <ResultsList
+                results={results || []}
+                loading={loading}
+                stats={stats}
+                source={source}
+                onLoadMore={loadMore}
+                loadingMore={loadingMore}
+                hasMore={hasMore}
+                totalResults={totalResults}
+              />
             </section>
 
             {/* Bannière publicitaire - après les résultats */}

@@ -149,9 +149,9 @@ class RechercheEntreprisesService {
    * @param {number} params.centerLat - Latitude du centre
    * @param {number} params.centerLon - Longitude du centre
    */
-  async searchCompanies({ city, postcode, sector, radius = 5, centerLat, centerLon }) {
+  async searchCompanies({ city, postcode, sector, radius = 5, centerLat, centerLon, startPage = 1 }) {
     try {
-      console.log('🔍 Recherche API Gouv...', { city, postcode, sector, radius });
+      console.log('🔍 Recherche API Gouv...', { city, postcode, sector, radius, startPage });
 
       const nafCodes = this.getSectorNafCodes(sector);
 
@@ -180,30 +180,35 @@ class RechercheEntreprisesService {
         console.log(`📊 Recherche avec ${nafCodes.length} codes NAF pour le secteur "${sector}"`);
       }
 
-      // Première page pour connaître le total
-      const firstResponse = await this.fetchWithRetry(`${this.baseURL}/near_point`, {
-        params: { ...baseParams, page: 1 },
-        timeout: 15000
-      });
+      // Récupérer jusqu'à 2 pages par appel (25 résultats par page)
+      const MAX_PAGES = 2;
+      let allResults = [];
+      let totalResults = 0;
+      let totalPages = 1;
 
-      const totalResults = firstResponse.data.total_results || 0;
-      const totalPages = firstResponse.data.total_pages || 1;
-      console.log(`📊 Total disponible: ${totalResults} entreprises (${totalPages} pages)`);
-
-      // Récupérer jusqu'à 100 résultats (4 pages) en parallèle
-      const MAX_PAGES = 4;
-      const pagesToFetch = Math.min(totalPages, MAX_PAGES) - 1; // -1 car page 1 déjà récupérée
-
-      let allResults = [...(firstResponse.data.results || [])];
-
-      if (pagesToFetch > 0) {
-        for (let i = 0; i < pagesToFetch; i++) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+      for (let i = 0; i < MAX_PAGES; i++) {
+        const pageNum = startPage + i;
+        try {
+          if (i > 0) await new Promise(resolve => setTimeout(resolve, 1200));
           const response = await this.fetchWithRetry(`${this.baseURL}/near_point`, {
-            params: { ...baseParams, page: i + 2 },
+            params: { ...baseParams, page: pageNum },
             timeout: 15000
           });
-          allResults.push(...(response.data.results || []));
+          if (i === 0) {
+            totalResults = response.data.total_results || 0;
+            totalPages = response.data.total_pages || 1;
+            console.log(`📊 Total disponible: ${totalResults} entreprises (${totalPages} pages)`);
+          }
+          const pageResults = response.data.results || [];
+          if (pageResults.length === 0) break;
+          allResults.push(...pageResults);
+          if (pageNum >= totalPages) break;
+        } catch (pageErr) {
+          if (pageErr.response?.status === 429) {
+            console.warn(`⚠️ Page ${pageNum} bloquée par rate-limit — retour des ${allResults.length} résultats`);
+            break;
+          }
+          throw pageErr;
         }
       }
 
@@ -220,8 +225,10 @@ class RechercheEntreprisesService {
 
       companies.sort((a, b) => (a.distance || 999) - (b.distance || 999));
 
+      const nextStartPage = (startPage + MAX_PAGES <= totalPages) ? startPage + MAX_PAGES : null;
+
       console.log(`✅ ${companies.length} entreprises dans le rayon de ${apiRadius}km`);
-      return companies;
+      return { companies, totalResults, totalPages, nextStartPage };
 
     } catch (error) {
       console.error('❌ Erreur API Recherche Entreprises:');
@@ -408,14 +415,14 @@ class RechercheEntreprisesService {
    * @param {number} params.centerLat
    * @param {number} params.centerLon
    */
-  async searchAssociations({ city, postcode, domain = '', radius = 10, centerLat, centerLon }) {
+  async searchAssociations({ city, postcode, domain = '', radius = 10, centerLat, centerLon, startPage = 1 }) {
     try {
-      console.log('🔍 Recherche associations...', { city, postcode, domain, radius });
+      console.log('🔍 Recherche associations...', { city, postcode, domain, radius, startPage });
 
       const ASSOCIATION_NJ_CODES = ['9110', '9210', '9220', '9230', '9260', '9270'];
 
       const baseParams = {
-        page: 1,
+        page: startPage,
         per_page: 25,
         etat_administratif: 'A'
       };
@@ -425,9 +432,10 @@ class RechercheEntreprisesService {
       }
 
       let allResults = [];
+      let totalPages = 1;
+      let totalResults = 0;
 
       if (domain) {
-        // Recherche par codes NAF du domaine, puis filtre côté client sur forme juridique association
         const nafCodes = this.getDomainNafCodes(domain);
         if (nafCodes && nafCodes.length > 0) {
           console.log(`📊 Recherche asso avec ${nafCodes.length} codes NAF pour le domaine "${domain}"`);
@@ -437,16 +445,16 @@ class RechercheEntreprisesService {
             timeout: 15000
           });
 
+          totalResults = response.data.total_results || 0;
+          totalPages = response.data.total_pages || 1;
           allResults = response.data.results || [];
 
-          // Filtrer côté client pour ne garder que les associations
           allResults = allResults.filter(ent => {
             const nj = String(ent.nature_juridique || '');
             return ASSOCIATION_NJ_CODES.some(code => nj.startsWith(code.slice(0, 2)));
           });
         }
       } else {
-        // Sans domaine : requête unique avec tous les codes nature_juridique
         console.log('📊 Recherche toutes associations (par nature_juridique)');
 
         const response = await this.fetchWithRetry(`${this.baseURL}/search`, {
@@ -454,10 +462,12 @@ class RechercheEntreprisesService {
           timeout: 15000
         });
 
+        totalResults = response.data.total_results || 0;
+        totalPages = response.data.total_pages || 1;
         allResults = response.data.results || [];
       }
 
-      console.log(`📊 Total: ${allResults.length} associations uniques trouvées`);
+      console.log(`📊 Total: ${allResults.length} associations trouvées (page ${startPage}/${totalPages})`);
 
       // Transformer les résultats
       const companies = allResults.map(ent => this.transformData(ent));
@@ -477,9 +487,11 @@ class RechercheEntreprisesService {
         filteredCompanies.sort((a, b) => (a.distance || 999) - (b.distance || 999));
       }
 
+      const nextStartPage = startPage < totalPages ? startPage + 1 : null;
+
       console.log(`✅ ${filteredCompanies.length} associations dans le rayon de ${radius}km`);
 
-      return filteredCompanies;
+      return { companies: filteredCompanies, totalResults, nextStartPage };
 
     } catch (error) {
       console.error('❌ Erreur recherche associations:', error.message);
@@ -487,14 +499,16 @@ class RechercheEntreprisesService {
     }
   }
 
-  async fetchWithRetry(url, config, retries = 3, delay = 2000) {
+  async fetchWithRetry(url, config, retries = 4, delay = 3000) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         return await axios.get(url, config);
       } catch (err) {
         if (err.response?.status === 429 && attempt < retries) {
-          console.warn(`   ⚠️ 429 reçu, retry ${attempt}/${retries - 1} dans ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          const retryAfter = err.response.headers?.['retry-after'];
+          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : delay;
+          console.warn(`   ⚠️ 429 reçu, retry ${attempt}/${retries} dans ${waitMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
           delay *= 2;
         } else {
           throw err;
