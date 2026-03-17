@@ -149,6 +149,21 @@ const validateSearchRequest = [
       return Math.max(0, Math.min(200, num));
     }),
   
+  // Validation de startPage (pagination "charger plus")
+  body('startPage')
+    .optional()
+    .custom((value) => {
+      const num = parseInt(value, 10);
+      if (isNaN(num) || num < 1 || num > 1000) {
+        throw new Error('startPage doit être un entier entre 1 et 1000');
+      }
+      return true;
+    })
+    .customSanitizer(value => {
+      const num = parseInt(value, 10);
+      return isNaN(num) ? 1 : Math.max(1, Math.min(1000, num));
+    }),
+
   // Validation du secteur avec whitelist
   body('sector')
     .optional()
@@ -336,6 +351,20 @@ const validateAssociationSearch = [
       const num = parseInt(value, 10);
       if (isNaN(num)) return 10;
       return Math.max(0, Math.min(200, num));
+    }),
+
+  body('startPage')
+    .optional()
+    .custom((value) => {
+      const num = parseInt(value, 10);
+      if (isNaN(num) || num < 1 || num > 1000) {
+        throw new Error('startPage doit être un entier entre 1 et 1000');
+      }
+      return true;
+    })
+    .customSanitizer(value => {
+      const num = parseInt(value, 10);
+      return isNaN(num) ? 1 : Math.max(1, Math.min(1000, num));
     }),
 
   body('domain')

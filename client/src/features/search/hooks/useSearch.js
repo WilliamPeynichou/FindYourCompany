@@ -14,26 +14,26 @@ export const useSearch = () => {
   const [totalResults, setTotalResults] = useState(0);
 
   const lastFormData = useRef(null);
-  const nextStartPage = useRef(null);
+  const lastNextPage = useRef(null);
 
-  const fetchCompanies = async (formData, startPage, append) => {
+  // Unique point d'entrée pour tout appel API — identique pour recherche initiale et "load more"
+  const _doSearch = async ({ formData, startPage, append }) => {
+    setError(null);
+
+    const requestData = {
+      location: {
+        city: formData.location.city || '',
+        postcode: formData.location.postcode || '',
+        lat: formData.location.lat || '',
+        lon: formData.location.lon || '',
+        label: formData.location.label || ''
+      },
+      radius: formData.radius || 5,
+      sector: formData.sector || '',
+      startPage
+    };
+
     try {
-      if (!formData.location) throw new Error('Localisation incomplète. Veuillez sélectionner un lieu.');
-      if (!formData.location.postcode && !formData.location.city) throw new Error('Ville ou code postal requis pour la recherche.');
-
-      const requestData = {
-        location: {
-          city: formData.location.city || '',
-          postcode: formData.location.postcode || '',
-          lat: formData.location.lat || '',
-          lon: formData.location.lon || '',
-          label: formData.location.label || ''
-        },
-        radius: formData.radius || 5,
-        sector: formData.sector || '',
-        startPage
-      };
-
       const response = await axios.post(
         `${API_BASE_URL}/api/companies/search-gouv`,
         requestData,
@@ -42,17 +42,16 @@ export const useSearch = () => {
 
       const companies = response.data.companies || [];
 
-      if (response.data.stats && !append) setStats(response.data.stats);
-      if (response.data.source && !append) setSource(response.data.source);
-
-      if (append) {
-        setResults(prev => [...prev, ...companies]);
-      } else {
+      if (!append) {
         setResults(companies);
+        setStats(response.data.stats || null);
+        setSource(response.data.source || null);
         if (companies.length === 0) setError('Aucune entreprise trouvée dans cette zone.');
+      } else {
+        setResults(prev => [...prev, ...companies]);
       }
 
-      nextStartPage.current = response.data.nextStartPage || null;
+      lastNextPage.current = response.data.nextStartPage || null;
       setHasMore(!!response.data.nextStartPage);
       setTotalResults(response.data.totalResults || 0);
 
@@ -71,25 +70,24 @@ export const useSearch = () => {
   };
 
   const performSearch = async (formData) => {
+    lastFormData.current = formData;
+    lastNextPage.current = null;
     setLoading(true);
-    setError(null);
     setResults([]);
     setStats(null);
     setSource(null);
     setHasMore(false);
     setTotalResults(0);
-    lastFormData.current = formData;
-    nextStartPage.current = null;
 
-    await fetchCompanies(formData, 1, false);
+    await _doSearch({ formData, startPage: 1, append: false });
     setLoading(false);
   };
 
+  // Même logique que performSearch, juste en append avec la page suivante
   const loadMore = async () => {
-    if (!lastFormData.current || !nextStartPage.current || loadingMore) return;
+    if (!lastFormData.current || !lastNextPage.current) return;
     setLoadingMore(true);
-    setError(null);
-    await fetchCompanies(lastFormData.current, nextStartPage.current, true);
+    await _doSearch({ formData: lastFormData.current, startPage: lastNextPage.current, append: true });
     setLoadingMore(false);
   };
 
