@@ -197,14 +197,14 @@ class RechercheEntreprisesService {
       let allResults = [...(firstResponse.data.results || [])];
 
       if (pagesToFetch > 0) {
-        const pageRequests = Array.from({ length: pagesToFetch }, (_, i) =>
-          this.fetchWithRetry(`${this.baseURL}/near_point`, {
+        for (let i = 0; i < pagesToFetch; i++) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          const response = await this.fetchWithRetry(`${this.baseURL}/near_point`, {
             params: { ...baseParams, page: i + 2 },
             timeout: 15000
-          })
-        );
-        const responses = await Promise.all(pageRequests);
-        responses.forEach(r => allResults.push(...(r.data.results || [])));
+          });
+          allResults.push(...(response.data.results || []));
+        }
       }
 
       console.log(`📊 ${allResults.length} entreprises récupérées (sur ${totalResults} disponibles)`);
@@ -487,7 +487,7 @@ class RechercheEntreprisesService {
     }
   }
 
-  async fetchWithRetry(url, config, retries = 3, delay = 1000) {
+  async fetchWithRetry(url, config, retries = 3, delay = 2000) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         return await axios.get(url, config);
