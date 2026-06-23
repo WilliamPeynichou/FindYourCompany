@@ -12,7 +12,7 @@ const searchSchema = z.object({
   location: z.object({
     label: z.string()
       .max(200, "Le label est trop long")
-      .refine(val => !/[<>\"']/.test(val), "Le label contient des caractères invalides"),
+      .refine(val => !/[<>"']/.test(val), "Le label contient des caractères invalides"),
     lat: z.string()
       .refine(val => {
         const num = parseFloat(val);
@@ -25,7 +25,7 @@ const searchSchema = z.object({
       }, "La longitude doit être entre -180 et 180"),
     city: z.string()
       .max(100, "Le nom de la ville est trop long")
-      .regex(/^[a-zA-ZÀ-ÿ\s\-'\.]*$/, "Le nom de la ville contient des caractères invalides")
+      .regex(/^[a-zA-ZÀ-ÿ\s'.-]*$/, "Le nom de la ville contient des caractères invalides")
       .optional(),
     postcode: z.string()
       .regex(/^[0-9]{5}$|^$/, "Le code postal doit contenir 5 chiffres")
@@ -36,12 +36,12 @@ const searchSchema = z.object({
     .max(200, "Le rayon ne peut pas dépasser 200 km"),
   sector: z.string()
     .max(100, "Le secteur est trop long")
-    .regex(/^[a-zA-ZÀ-ÿ0-9\s\/\-\.]*$/, "Le secteur contient des caractères invalides")
+      .regex(/^[a-zA-ZÀ-ÿ0-9\s/.-]*$/, "Le secteur contient des caractères invalides")
     .optional()
 });
 
-export const SearchForm = ({ onSearch, loading }) => {
-  const { control, handleSubmit, formState: { errors }, setValue } = useForm({
+export const SearchForm = ({ onSearch, loading, alternanceMode = false }) => {
+  const { control, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(searchSchema),
     defaultValues: {
       location: null,
@@ -56,6 +56,12 @@ export const SearchForm = ({ onSearch, loading }) => {
 
   return (
     <form onSubmit={handleSubmit(onSearch)} className="max-w-xl mx-auto space-y-8 bg-white p-2 md:p-0">
+      {alternanceMode && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-sm text-red-900">
+          <p className="font-bold">Trouver des entreprises pour ton alternance</p>
+          <p className="text-red-700 mt-1">Choisis ta zone et ton domaine. Les résultats t'aideront à prioriser les entreprises à contacter.</p>
+        </div>
+      )}
       
       {/* 1. Sélection de la localisation */}
       <Controller
@@ -105,7 +111,7 @@ export const SearchForm = ({ onSearch, loading }) => {
             className="w-full py-4 text-lg rounded-full"
             disabled={loading}
           >
-            {loading ? "Recherche..." : "Rechercher les entreprises"}
+            {loading ? "Recherche..." : alternanceMode ? "Trouver où candidater" : "Rechercher les entreprises"}
           </Button>
         </div>
       )}
