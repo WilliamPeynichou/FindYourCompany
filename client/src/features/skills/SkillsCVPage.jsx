@@ -6,7 +6,7 @@ const CONTRACT_TYPES = [
   {
     id: 'ALTERNANCE',
     label: 'Alternance',
-    emoji: '🎓',
+    
     color: 'bg-purple-600',
     colorLight: 'bg-purple-50 border-purple-200 text-purple-900',
     desc: 'Contrat d'apprentissage ou de professionnalisation',
@@ -14,7 +14,7 @@ const CONTRACT_TYPES = [
   {
     id: 'CDI',
     label: 'CDI',
-    emoji: '📄',
+    
     color: 'bg-green-600',
     colorLight: 'bg-green-50 border-green-200 text-green-900',
     desc: 'Contrat à durée indéterminée',
@@ -22,7 +22,7 @@ const CONTRACT_TYPES = [
   {
     id: 'CDD',
     label: 'CDD',
-    emoji: '📋',
+    
     color: 'bg-blue-600',
     colorLight: 'bg-blue-50 border-blue-200 text-blue-900',
     desc: 'Contrat à durée déterminée',
@@ -30,7 +30,7 @@ const CONTRACT_TYPES = [
   {
     id: 'INTERIM',
     label: 'Intérim',
-    emoji: '⚡',
+    
     color: 'bg-orange-500',
     colorLight: 'bg-orange-50 border-orange-200 text-orange-900',
     desc: 'Mission d'intérim / travail temporaire',
@@ -431,7 +431,7 @@ Consigne : aide-moi à transformer ces informations en CV, email de candidature 
                   ? `${c.color} text-white border-transparent shadow-lg scale-105`
                   : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-zinc-400 hover:bg-zinc-100'}`}
             >
-              <span className="text-2xl">{c.emoji}</span>
+              
               <span>{c.label}</span>
               {contractType === c.id && <span className="text-[10px] font-normal opacity-80">{c.desc}</span>}
             </button>
@@ -440,7 +440,7 @@ Consigne : aide-moi à transformer ces informations en CV, email de candidature 
 
         {/* Badge contextuel */}
         <div className={`mt-4 rounded-2xl px-4 py-3 border text-sm font-medium flex items-center gap-2 ${activeContract?.colorLight}`}>
-          <span>{activeContract?.emoji}</span>
+          
           <span>
             {contractType === 'ALTERNANCE' && 'Les compétences junior et le rythme école/entreprise sont mis en avant.'}
             {contractType === 'CDI' && 'Les compétences avancées, l'autonomie et les livrables durables sont prioritaires.'}
@@ -471,7 +471,7 @@ Consigne : aide-moi à transformer ces informations en CV, email de candidature 
                     ? 'text-left text-sm bg-red-600 text-white px-3 py-2 rounded-xl'
                     : 'text-left text-sm bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-xl hover:border-zinc-400'}
                 >
-                  {item.family === 'it' ? '💻 ' : ''}{item.label}
+                  {item.label}
                 </button>
               ))}
             </div>
@@ -501,7 +501,7 @@ Consigne : aide-moi à transformer ces informations en CV, email de candidature 
             {/* Shortcut : compétences recommandées pour ce contrat */}
             {emphasizedSkills.length > 0 && (
               <div className={`mb-4 rounded-2xl p-3 border ${activeContract?.colorLight}`}>
-                <p className="text-xs font-semibold mb-2">⭐ Recommandées pour un {contractLabel}</p>
+                <p className="text-xs font-semibold mb-2">Recommandées pour un {contractLabel}</p>
                 <div className="flex flex-wrap gap-2">
                   {emphasizedSkills.map(skill => (
                     <button
