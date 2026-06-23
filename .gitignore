@@ -58,3 +58,9 @@ Thumbs.db
 *.temp
 .cache/
 
+
+# Claake
+.claakecode/
+
+# Markdown files
+*.md
