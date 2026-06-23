@@ -1,4 +1,4 @@
-name: 🚀 Deploy to O2Switch
+name: Deploy to Railway
 
 on:
   push:
@@ -6,85 +6,53 @@ on:
       - main
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  # ── Backend ────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy API (server)
     runs-on: ubuntu-latest
-
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────
-      - name: ⬇️ Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 2. Setup Node ─────────────────────────────────────────────
-      - name: 🟢 Setup Node.js
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy server to Railway
+        working-directory: server
+        run: railway up --service ${{ secrets.RAILWAY_SERVICE_BACKEND }} --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ── Frontend ───────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Build & Deploy client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: client/package-lock.json
 
-      # ── 3. Build frontend ─────────────────────────────────────────
-      - name: 📦 Install client dependencies
+      - name: Install dependencies
         working-directory: client
         run: npm ci
 
-      - name: 🏗️ Build frontend (Vite)
+      - name: Build (Vite)
         working-directory: client
         run: npm run build
         env:
           NODE_ENV: production
 
-      # ── 4. Deploy via SSH ─────────────────────────────────────────
-      - name: 🔑 Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.O2SWITCH_SSH_KEY }}
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
-      - name: 📂 Add O2Switch to known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.O2SWITCH_SSH_HOST }} >> ~/.ssh/known_hosts
-
-      # ── 5. Deploy Frontend ────────────────────────────────────────
-      - name: 🌐 Deploy Frontend to public_html
-        run: |
-          rsync -avz --delete \
-            -e "ssh -p 22" \
-            client/dist/ \
-            ${{ secrets.O2SWITCH_SSH_USER }}@${{ secrets.O2SWITCH_SSH_HOST }}:~/public_html/trouvetaboite.com/
-
-      - name: 📄 Copy .htaccess
-        run: |
-          scp -P 22 \
-            client/public/.htaccess \
-            ${{ secrets.O2SWITCH_SSH_USER }}@${{ secrets.O2SWITCH_SSH_HOST }}:~/public_html/trouvetaboite.com/.htaccess
-
-      # ── 6. Deploy Backend ─────────────────────────────────────────
-      - name: ⚙️ Deploy Backend to nodejs folder
-        run: |
-          rsync -avz --delete \
-            --exclude='node_modules' \
-            --exclude='.env' \
-            -e "ssh -p 22" \
-            server/ \
-            ${{ secrets.O2SWITCH_SSH_USER }}@${{ secrets.O2SWITCH_SSH_HOST }}:~/nodejs/trouvetaboite-api/
-
-      # ── 7. Install deps & Restart API ────────────────────────────
-      - name: 🔄 Install server deps & restart Node.js app
-        run: |
-          ssh -p 22 ${{ secrets.O2SWITCH_SSH_USER }}@${{ secrets.O2SWITCH_SSH_HOST }} << 'EOF'
-            source ~/.bashrc || true
-            cd ~/nodejs/trouvetaboite-api
-            npm install --omit=dev
-            # Redémarrage via le script de contrôle O2Switch (passenger)
-            touch tmp/restart.txt 2>/dev/null || true
-            # Ou via le script cpanel si disponible :
-            ~/nodevenv/trouvetaboite-api/20/bin/node ~/nodejs/trouvetaboite-api/index.js --check 2>/dev/null || true
-          EOF
-
-      # ── 8. Résumé ─────────────────────────────────────────────────
-      - name: ✅ Deployment summary
-        run: |
-          echo "✅ Déploiement terminé !"
-          echo "🌐 Frontend : https://trouvetaboite.com"
-          echo "🔌 API      : https://trouvetaboite.com/api/health"
+      - name: Deploy client to Railway
+        working-directory: client
+        run: railway up --service ${{ secrets.RAILWAY_SERVICE_FRONTEND }} --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
