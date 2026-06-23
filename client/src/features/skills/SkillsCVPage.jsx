@@ -173,6 +173,76 @@ CONSIGNE POUR L'IA
 Génère le contenu final du CV selon CV-IT.md ${contractOutput}. Priorise la pertinence ATS, compresse pour 1 page A4, hiérarchise les compétences, reformule les projets selon le poste.`;
 };
 
+// ─── Conseils CV par secteur (hors tech) ────────────────────────────────────────
+const SECTOR_CV_TIPS = {
+  marketing:     { sections: 'Profil, Expériences (campagnes & résultats), Compétences, Outils, Formation, Langues', highlight: 'résultats chiffrés (taux d\'engagement, conversion, croissance d\'audience), campagnes pilotées, outils maîtrisés', proof: 'liens vers réalisations, portfolio ou comptes gérés' },
+  commerce:      { sections: 'Profil, Expériences commerciales (chiffres), Compétences, Formation, Langues', highlight: 'CA généré, objectifs atteints (%), taille du portefeuille clients, cycles de vente', proof: 'résultats commerciaux concrets et récompenses éventuelles' },
+  communication: { sections: 'Profil, Expériences, Réalisations, Compétences, Outils, Formation, Langues', highlight: 'productions concrètes (campagnes, contenus, événements), audiences touchées, ligne éditoriale', proof: 'book / portfolio / lien vers réalisations' },
+  design:        { sections: 'Profil, Portfolio (lien indispensable), Expériences, Compétences, Outils, Formation', highlight: 'qualité visuelle du portfolio, projets phares, maîtrise des outils (Figma, suite Adobe)', proof: 'lien portfolio obligatoire en haut du CV' },
+  accounting:    { sections: 'Profil, Expériences, Compétences, Logiciels, Formation, Langues', highlight: 'rigueur, logiciels maîtrisés (Sage, Cegid…), types de déclarations et clôtures gérées, volumes traités', proof: 'périmètre comptable géré (CA, nombre de dossiers)' },
+  hr:            { sections: 'Profil, Expériences RH, Compétences, Outils, Formation, Langues', highlight: 'volumes de recrutements, processus pilotés, confidentialité, marque employeur', proof: 'nombre de recrutements / collaborateurs gérés' },
+  project:       { sections: 'Profil, Expériences (projets pilotés), Compétences, Méthodes, Outils, Formation', highlight: 'budgets, délais tenus, taille des équipes, KPI atteints, méthodologie (Agile…)', proof: 'projets chiffrés (budget, délais, ROI)' },
+  realestate:    { sections: 'Profil, Expériences, Résultats commerciaux, Compétences, Formation, Langues', highlight: 'volume de ventes/mandats, CA généré, secteur géographique, fidélisation', proof: 'chiffres de transactions et mandats signés' },
+  hotel:         { sections: 'Profil, Expériences, Compétences, Langues (clé), Formation', highlight: 'sens du service, établissements/standing, volume de couverts ou clients, langues parlées', proof: 'types d\'établissements et niveau de gamme' },
+  btp:           { sections: 'Profil, Expériences (chantiers), Compétences, Habilitations & sécurité, Formation', highlight: 'chantiers réalisés, normes de sécurité, habilitations/CACES, lecture de plans', proof: 'liste des habilitations et types de chantiers' },
+  social:        { sections: 'Profil, Expériences, Compétences, Diplômes d\'État, Formation, Langues', highlight: 'publics accompagnés, diplômes d\'État, empathie, posture professionnelle', proof: 'diplômes d\'État et publics pris en charge' },
+};
+
+// ─── Build CV skill (hors tech) ─────────────────────────────────────────────────
+const buildNonTechOutput = ({ profile, domain, selectedStack, contractOutput }) => {
+  const fullName = `${profile.firstName || 'PRÉNOM'} ${profile.lastName || 'NOM'}`.trim();
+  const tips = SECTOR_CV_TIPS[domain.id] || {
+    sections: 'Profil, Expériences, Compétences, Formation, Langues, Centres d\'intérêt',
+    highlight: 'résultats concrets et qualités clés du métier',
+    proof: 'références ou réalisations vérifiables',
+  };
+  const skills = selectedStack.join(', ') || domain.technical.slice(0, 8).join(', ');
+  return `SKILL — CRÉATION DE CV PROFESSIONNEL · ${domain.label.toUpperCase()} (${contractOutput})
+
+Tu es un expert en recrutement et en conception de CV spécialisé dans le secteur « ${domain.label} ». Ton objectif : produire un CV final de qualité professionnelle, livré en PDF prêt à envoyer.
+
+═══ ÉTAPE 1 — QUESTION OBLIGATOIRE (ne génère RIEN avant ma réponse) ═══
+Pose-moi d'abord cette question, puis ATTENDS ma réponse :
+
+« Souhaitez-vous :
+  (A) un CV ATS — sobre, une seule colonne, sans tableau ni graphique, optimisé pour les logiciels de tri automatique des recruteurs ;
+  (B) un CV DESIGN — mise en page soignée et moderne, mise en valeur visuelle, idéal pour un envoi direct ou en main propre ? »
+
+- Si je réponds A (ATS) : police standard (Arial/Calibri), structure une seule colonne, titres clairs, AUCUNE image/icône/colonne/tableau, intègre les mots-clés exacts de l'offre, format 100 % parsable.
+- Si je réponds B (DESIGN) : mise en page élégante et professionnelle adaptée au secteur ${domain.label}, hiérarchie visuelle soignée, couleurs maîtrisées, lisibilité avant tout.
+
+═══ ÉTAPE 2 — GÉNÉRATION DU CV ═══
+Une fois mon choix connu :
+- Adapte le contenu, le vocabulaire et le ton au secteur ${domain.label}.
+- Sections recommandées : ${tips.sections}.
+- Mets en avant : ${tips.highlight}.
+- Ajoute des preuves : ${tips.proof}.
+- 1 page si moins de 5 ans d'expérience, 2 pages maximum sinon.
+- Reformule chaque expérience avec des verbes d'action et, dès que possible, des résultats chiffrés.
+- Utilise les mots-clés de l'offre quand ils sont fournis.
+
+═══ ÉTAPE 3 — EXPORT PDF ═══
+Génère le CV final puis fournis-le en PDF téléchargeable. Si tu ne peux pas exporter directement un fichier, produis le CV en HTML/CSS prêt à imprimer (format A4, marges propres) OU en Markdown clairement structuré, et explique comment l'exporter en PDF en un clic.
+
+═══ DONNÉES DU CANDIDAT ═══
+Nom : ${fullName}
+Poste visé : ${profile.targetJob || domain.label}
+Contrat recherché : ${contractOutput}
+Contact : ${profile.phone || 'tél. à compléter'} | ${profile.email || 'email à compléter'} | ${profile.city || profile.mobility || 'ville à compléter'}
+Formation : ${profile.formation || 'À compléter'}${profile.level ? ` — ${profile.level}` : ''}
+Compétences clés : ${skills}
+Qualités : ${domain.soft.join(', ')}
+Missions / responsabilités possibles : ${domain.missions.join(', ')}
+Expériences : ${profile.experiences || 'À compléter : poste — entreprise | dates + résultats'}
+Certifications : ${profile.certifications || 'À compléter si pertinent'}
+Langues : ${profile.languages || 'À compléter'} | Permis : ${profile.drivingLicense || 'À compléter'}
+Centres d'intérêt : ${profile.interests || 'À compléter'}
+Objectif professionnel : ${profile.goals || 'À compléter'}
+Mots-clés de l'offre à retrouver : ${profile.jobOfferKeywords || 'À compléter si tu as une annonce'}
+
+Commence maintenant par l'ÉTAPE 1.`;
+};
+
 // ─── Empty profile ─────────────────────────────────────────────────────────────
 const emptyProfile = {
   firstName: '', lastName: '', phone: '', email: '', city: '',
@@ -208,6 +278,11 @@ export const SkillsCVPage = () => {
     return buildCvItOutput({ profile, domain, selectedStack, projectLinks, contractOutput });
   }, [isItProfile, profile, domain, selectedStack, projectLinks, contractOutput]);
 
+  const nonTechOutput = useMemo(() => {
+    if (isItProfile) return '';
+    return buildNonTechOutput({ profile, domain, selectedStack, contractOutput });
+  }, [isItProfile, profile, domain, selectedStack, contractOutput]);
+
   const generatedProfile = useMemo(() => `${isItProfile ? `${cvItOutput}\n\n---\n\n` : ''}PROFIL POUR CANDIDATURE — ${contractOutput.toUpperCase()}
 
 Métier ou domaine visé : ${profile.targetJob || domain.label}
@@ -237,19 +312,19 @@ ${profile.experiences || 'À compléter'}
 Objectif professionnel :
 ${profile.goals || 'À compléter'}
 
-Consigne : aide-moi à transformer ces informations en CV, email de candidature ou lettre de motivation ${contractOutput}.${isItProfile ? ' Pour ce profil informatique/data, priorise la sortie CV-IT, la stack, les projets et les liens GitHub.' : ''}`,
+Consigne : aide-moi à transformer ces informations en CV, email de candidature ou lettre de motivation ${contractOutput}.${isItProfile ? ' Pour ce profil informatique/data, priorise la sortie CV-IT, la stack, les projets et les liens GitHub.' : ' Pour ce profil, demande-moi d\'abord si je veux un CV ATS ou un CV design, puis génère le CV adapté à mon secteur et livre-le en PDF.'}`,
     [profile, selectedStack, domain, isItProfile, cvItOutput, projectLinks, contractOutput]);
 
   const promptTemplates = useMemo(() => [
     isItProfile
       ? [`CV-IT — ${contractLabel}`, `À partir du profil ci-dessous, applique CV-IT.md : crée un CV ATS-friendly sur 1 page A4 ${contractOutput}. Structure fixe : Header, Profil, Compétences, Expérience, Projets, Formation, Certifications. Donne un contenu prêt à intégrer.`]
-      : [`Améliore mon CV ${contractOutput}`, `À partir du profil ci-dessous, aide-moi à créer un CV ${contractOutput}. Propose un titre, une accroche et reformule mes expériences de façon professionnelle.`],
+      : [`CV pro en PDF — ATS ou design`, `Tu es expert en CV pour le secteur ${domain.label}. AVANT de générer, demande-moi si je veux un CV ATS (sobre, parsable) ou un CV design (mise en page soignée). Puis crée mon CV ${contractOutput}, adapté au secteur, et livre-le en PDF (ou HTML A4 prêt à imprimer en PDF). Utilise le profil ci-dessous.`],
     [`Email de candidature ${contractOutput}`, `Rédige un email de candidature spontanée ${contractOutput} à partir de mon profil. Ton professionnel, concis, orienté valeur ajoutée immédiate.`],
     [`Lettre de motivation ${contractOutput}`, `Rédige une lettre de motivation courte ${contractOutput} à partir de mon profil. Une page, ton direct, preuves concrètes.`],
     [`Adapte mon profil à cette entreprise`, `À partir de mon profil et des informations de l'entreprise que je vais ajouter, explique quels arguments mettre en avant pour un recruteur ${contractOutput}.`],
     [`Trouve les compétences à mettre en avant`, `Analyse mon profil et liste les compétences les plus pertinentes pour un CV ${contractOutput}.`],
     [`Corrige et rends mon message plus professionnel`, `Corrige le message que je vais écrire ensuite. Rends-le plus professionnel et adapté à une candidature ${contractOutput}.`],
-  ], [contractOutput, contractLabel, isItProfile]);
+  ], [contractOutput, contractLabel, isItProfile, domain]);
 
   return (
     <section className="space-y-8">
@@ -298,6 +373,16 @@ Consigne : aide-moi à transformer ces informations en CV, email de candidature 
                 <BrainCircuit className="w-4 h-4" /> Mode CV-IT activé
               </div>
               <p className="text-xs text-blue-800">La sortie suit CV-IT.md : Header, Profil, Compétences, Expérience, Projets, Formation, Certifications — ATS-friendly 1 page A4.</p>
+            </div>
+          )}
+
+          {/* Mode CV pro (hors tech) */}
+          {!isItProfile && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-5">
+              <div className="flex items-center gap-2 mb-1 text-emerald-900 font-bold text-sm">
+                <BrainCircuit className="w-4 h-4" /> Mode CV pro — {domain.label}
+              </div>
+              <p className="text-xs text-emerald-800">Le skill demande à l'IA de te poser la question <strong>CV ATS ou CV design</strong>, puis génère un CV adapté à ton secteur et le livre en <strong>PDF</strong>.</p>
             </div>
           )}
 
@@ -397,6 +482,19 @@ Consigne : aide-moi à transformer ces informations en CV, email de candidature 
                 <CopyButton text={cvItOutput}>Copier CV-IT</CopyButton>
               </div>
               <pre className="whitespace-pre-wrap text-xs bg-black/30 border border-white/10 rounded-2xl p-4 max-h-[360px] overflow-auto text-zinc-200">{cvItOutput}</pre>
+            </div>
+          )}
+
+          {!isItProfile && (
+            <div className="bg-zinc-950 text-white border border-zinc-800 rounded-3xl p-6">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Code2 className="w-5 h-5" /> Skill CV — <span className="text-zinc-400 text-sm font-normal">{domain.label}</span>
+                </h2>
+                <CopyButton text={nonTechOutput}>Copier le skill CV</CopyButton>
+              </div>
+              <p className="text-xs text-zinc-400 mb-3">Colle ce skill dans ChatGPT/Claude : il te demandera <strong>ATS ou design</strong>, puis génère ton CV en <strong>PDF</strong>.</p>
+              <pre className="whitespace-pre-wrap text-xs bg-black/30 border border-white/10 rounded-2xl p-4 max-h-[360px] overflow-auto text-zinc-200">{nonTechOutput}</pre>
             </div>
           )}
 
